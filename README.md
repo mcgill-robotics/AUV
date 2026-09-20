@@ -1,4 +1,4 @@
-# AUV-2026
+# AUV
 
 This project is currently under development
 
@@ -95,12 +95,12 @@ For more details, see [Docker/dev/README.md](Docker/dev/README.md).
 Once inside the container, use the build script. It automatically detects if you have the ZED SDK and builds accordingly.
 
 ```bash
-    cd /home/douglas/AUV-2026
+    cd /home/douglas/AUV
     ./build.sh
     source ros2_ws/install/setup.bash
 ```
 
-Note the script can be run from anywhere in the container and will always build inside the `AUV-2026/ros2_ws` folder.
+Note the script can be run from anywhere in the container and will always build inside the `AUV/ros2_ws` folder.
 
 Multiple build flags are available:
 -  `./build.sh` : Default Release Build, works for most cases

@@ -35,7 +35,7 @@ class RosbagManagerNode(Node):
 
         # Load profiles and config
         self.profiles = {}
-        self.save_dir = os.path.expanduser('~/AUV-2026/rosbags') # Default
+        self.save_dir = os.path.expanduser('~/AUV/rosbags') # Default
         try:
             with open(config_path, 'r') as f:
                 config = yaml.safe_load(f)

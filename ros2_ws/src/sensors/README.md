@@ -285,7 +285,7 @@ Below is a brief overview of how the sensors package interacts with each of thes
 
 ### Waterlinked DVL-a50
 
-There are two drivers available for the DVL-a50, [dvl_a50_serial_python](https://github.com/mcgill-robotics/dvl_a50_serial_python) and [dvl_a50](https://github.com/mcgill-robotics/dvl_a50), designed to work with the Waterlinked [serial](https://docs.waterlinked.com/dvl/dvl-protocol/#serial-protocol) and [ethernet JSON](https://docs.waterlinked.com/dvl/dvl-protocol/#json-protocol-tcp) protocols provided by Waterlinked. The tradeoffs between these drivers are outlined in [PR #99](https://github.com/mcgill-robotics/AUV-2026/pull/99).
+There are two drivers available for the DVL-a50, [dvl_a50_serial_python](https://github.com/mcgill-robotics/dvl_a50_serial_python) and [dvl_a50](https://github.com/mcgill-robotics/dvl_a50), designed to work with the Waterlinked [serial](https://docs.waterlinked.com/dvl/dvl-protocol/#serial-protocol) and [ethernet JSON](https://docs.waterlinked.com/dvl/dvl-protocol/#json-protocol-tcp) protocols provided by Waterlinked. The tradeoffs between these drivers are outlined in [PR #99](https://github.com/mcgill-robotics/AUV/pull/99).
 
 **The overall decision has been made to use the `dvl_a50_serial_python` driver for our main DVL interface** The `dvl_a50` ethernet driver will be kept as a backup and for testing purposes (a limited simulation of the JSON protocol is provided in a dev branch of [AUV Unity Simulation](https://github.com/mcgill-robotics/auv-sim-unity/tree/dev/DVLTCPServer)).
 

@@ -62,7 +62,7 @@ Running the Python scripts directly provides maximum modularity and makes debugg
    *(For segmentation: append `--task segment`)*
    Not needed, good to monitor training metrics.
    ```bash
-   python3 -m tensorboard.main --logdir /home/douglas/AUV-2026/ros2_ws/src/vision/model_pipeline/runs/rfdetr
+   python3 -m tensorboard.main --logdir /home/douglas/AUV/ros2_ws/src/vision/model_pipeline/runs/rfdetr
    ```
 
 *(Alternatively, you can run the automated script: `./training.sh --mode synthetic --model-type rfdetr`)*
@@ -96,7 +96,7 @@ After running the command, simply drag the generated `my_raw_images_prelabeled` 
     1. Do **NOT** add any pre-processing or augmentation steps in Roboflow; native PyTorch dataloaders heavily handle mosaic, jitter, and scaling dynamically during actual training.
 4. **Download Dataset to Machine**
     1. Select export format **YOLOv11** (even if using RF-DETR, because our script organizes everything automatically!).
-    2. Download the zip and extract its contents (`images/`, `labels/`, `data.yaml`) into `AUV-2026/ros2_ws/src/vision/model_pipeline/data/raw_import/`.
+    2. Download the zip and extract its contents (`images/`, `labels/`, `data.yaml`) into `AUV/ros2_ws/src/vision/model_pipeline/data/raw_import/`.
 5. **Undo Roboflow Shenanigans**
     1. Roboflow sometimes re-orders the labels in alphabetical order. To undo this and perfectly map everything to the correct targets (as defined in `classes.yaml`), simply run the `fix_labels.py` script.
     2. Run `python3 fix_labels.py --data-dir data/raw_import`. The script will automatically read the target labels from `classes.yaml` and the current labels from your Roboflow `data.yaml`, then correctly remap your dataset indices
@@ -129,7 +129,7 @@ TensorRT engines (`engine.plan`) must be compiled **ON THE JETSON inside the Doc
 
 3. **Compile the native TensorRT engine (`engine.plan`):**
    ```bash
-   cd /home/douglas/AUV-2026/ros2_ws/src/vision/models/<your_model_package>
+   cd /home/douglas/AUV/ros2_ws/src/vision/models/<your_model_package>
    trtexec --onnx=weights.onnx --saveEngine=engine.plan --fp16
    ```
 

@@ -29,7 +29,7 @@ services:
       - /etc/systemd/system/zed_x_daemon.service:/etc/systemd/system/zed_x_daemon.service
       - type: bind
         source: ../../
-        target: /home/douglas/AUV-2026
+        target: /home/douglas/AUV
     command: bash -c ${OVERRIDE_COMMAND:-"tail -f /dev/null"}
     build:
       context: ../../

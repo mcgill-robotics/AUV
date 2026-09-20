@@ -174,7 +174,7 @@ The package provides six ROS nodes: `depth_controller`, `attitude_controller`, `
 ### Building
 
 	source /opt/ros/humble/setup.bash
-	cd <AUV-2026>/ros2_ws
+	cd <AUV>/ros2_ws
 	colcon build --packages-select controls
 
 After build is complete, make the packages visible to ROS

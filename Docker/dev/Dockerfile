@@ -208,11 +208,11 @@ ENV COLCON_HOME=/home/$USERNAME/.colcon
 # move repo defaults.yaml to container
 COPY .colcon ${COLCON_HOME}/
 
-WORKDIR /home/$USERNAME/AUV-2026
+WORKDIR /home/$USERNAME/AUV
 
 # Add source commands to bashrc
 RUN echo "source /opt/ros/${ROS_DISTRO}/local_setup.bash && source /opt/ros/micro_ros_ws/install/local_setup.bash && source /opt/ros/foxglove_ws/install/local_setup.bash" >> ~/.bashrc && \
-    echo "if [ -f ~/AUV-2026/ros2_ws/install/setup.bash ]; then source ~/AUV-2026/ros2_ws/install/setup.bash; fi" >> ~/.bashrc
+    echo "if [ -f ~/AUV/ros2_ws/install/setup.bash ]; then source ~/AUV/ros2_ws/install/setup.bash; fi" >> ~/.bashrc
 
 # Entrypoint uses fixuid to remap UID/GID if running with --user
 ENTRYPOINT ["entrypoint.sh"]

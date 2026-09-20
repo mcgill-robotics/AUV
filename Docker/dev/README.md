@@ -69,7 +69,7 @@ docker compose up -d nvidia
 Once inside the container, use the build script. It automatically detects if you have the ZED SDK and builds accordingly.
 
 ```bash
-cd /root/AUV-2026
+cd /home/douglas/AUV
 ./build.sh
 source ros2_ws/install/setup.bash
 ```
