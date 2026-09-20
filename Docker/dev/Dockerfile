@@ -80,6 +80,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     # Bridge & Teleop
     ros-${ROS_DISTRO}-joy \
     ros-${ROS_DISTRO}-joy-teleop \
+    ros-${ROS_DISTRO}-foxglove-bridge \
     ros-${ROS_DISTRO}-foxglove-msgs \
     # Navigation & Localization
     ros-${ROS_DISTRO}-mavros \
@@ -140,21 +141,6 @@ RUN . /opt/ros/${ROS_DISTRO}/setup.sh && \
     "--no-warn-unused-cli" && \
     rm -rf build src log
 
-# ----------------------------------------------------------
-# Install Foxglove Bridge from source
-# ----------------------------------------------------------
-WORKDIR /opt/ros/foxglove_ws
-RUN git clone --depth 1 --branch sdk/v0.21.0 https://github.com/foxglove/foxglove-sdk.git src/foxglove-sdk && \
-    apt-get update && \
-    rm -rf /etc/ros/rosdep/sources.list.d/* && \
-    rosdep init && \
-    rosdep update --rosdistro ${ROS_DISTRO} && \
-    rosdep install -y --from-paths src --ignore-src --rosdistro ${ROS_DISTRO} && \
-    . /opt/ros/${ROS_DISTRO}/setup.sh && \
-    colcon build --packages-select foxglove_bridge \
-    --cmake-args -DCMAKE_BUILD_TYPE=Release && \
-    rm -rf build log src /var/lib/apt/lists/*
-WORKDIR /root
 
 # ---------------------------------------------------------
 # 3. Install Python ML & Vision Dependencies (CPU)
@@ -211,7 +197,7 @@ COPY .colcon ${COLCON_HOME}/
 WORKDIR /home/$USERNAME/AUV
 
 # Add source commands to bashrc
-RUN echo "source /opt/ros/${ROS_DISTRO}/local_setup.bash && source /opt/ros/micro_ros_ws/install/local_setup.bash && source /opt/ros/foxglove_ws/install/local_setup.bash" >> ~/.bashrc && \
+RUN echo "source /opt/ros/${ROS_DISTRO}/local_setup.bash && source /opt/ros/micro_ros_ws/install/local_setup.bash" >> ~/.bashrc && \
     echo "if [ -f ~/AUV/ros2_ws/install/setup.bash ]; then source ~/AUV/ros2_ws/install/setup.bash; fi" >> ~/.bashrc
 
 # Entrypoint uses fixuid to remap UID/GID if running with --user
