@@ -46,7 +46,9 @@ source /opt/ros/micro_ros_ws/install/local_setup.bash
 source /opt/ros/foxglove_ws/install/local_setup.bash
 source /opt/ros/vision_opencv_ws/install/local_setup.bash
 
-if [ -f "/home/douglas/AUV-2026/ros2_ws/install/setup.bash" ]; then
+if [ -f "/home/douglas/AUV/ros2_ws/install/setup.bash" ]; then
+    source /home/douglas/AUV/ros2_ws/install/setup.bash
+elif [ -f "/home/douglas/AUV-2026/ros2_ws/install/setup.bash" ]; then
     source /home/douglas/AUV-2026/ros2_ws/install/setup.bash
 fi
 

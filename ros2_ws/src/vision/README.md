@@ -439,7 +439,7 @@ To pre-compile and benchmark the engine before launching ROS nodes:
    ```
 2. Navigate to your model folder:
    ```bash
-   cd /home/douglas/AUV-2026/ros2_ws/src/vision/models/<your_model_dir>
+   cd /home/douglas/AUV/ros2_ws/src/vision/models/<your_model_dir>
    ```
 3. Ensure `model_config.json` specifies `"backend_type": "trt"` and `trt_config.json` exists:
    ```json

@@ -233,14 +233,14 @@ ENV COLCON_HOME=/home/$USERNAME/.colcon
 COPY .colcon ${COLCON_HOME}/
 
 # Create ultralytics config dir and set up bashrc in one layer
-WORKDIR /home/$USERNAME/AUV-2026
+WORKDIR /home/$USERNAME/AUV
 RUN mkdir -p /home/$USERNAME/.config/Ultralytics && \
     { \
         echo "source /opt/ros/jazzy/setup.bash"; \
         echo "source /opt/ros/micro_ros_ws/install/local_setup.bash"; \
         echo "source /opt/ros/foxglove_ws/install/local_setup.bash"; \
         echo "source /opt/ros/vision_opencv_ws/install/local_setup.bash"; \
-        echo "source /home/$USERNAME/AUV-2026/ros2_ws/install/setup.bash"; \
+        echo "if [ -f /home/$USERNAME/AUV/ros2_ws/install/setup.bash ]; then source /home/$USERNAME/AUV/ros2_ws/install/setup.bash; fi"; \
     } >> ~/.bashrc
 
 # Entrypoint to fix Group IDs to allow GPU access

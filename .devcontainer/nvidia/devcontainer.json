@@ -4,7 +4,7 @@
     "service": "nvidia",
     "runServices": ["nvidia"],
 
-    "workspaceFolder": "/home/douglas/AUV-2026",
+    "workspaceFolder": "/home/douglas/AUV",
     "remoteUser": "douglas",
 
     // This is vital for connecting to Unity on Windows/Mac
@@ -36,5 +36,5 @@
             ]
         }
     },
-    "postCreateCommand": "sudo chown -R douglas:douglas /home/douglas/AUV-2026",    
+    "postCreateCommand": "sudo chown -R douglas:douglas /home/douglas/AUV",    
 }

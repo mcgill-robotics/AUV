@@ -168,7 +168,7 @@ jobs:
         run: |
           docker run --rm \
             --user $(id -u):$(id -g) \
-            -v ${{ github.workspace }}:/home/douglas/AUV-2026 \
+            -v ${{ github.workspace }}:/home/douglas/AUV \
             ${{ env.PRIMARY_TAG }} \
             /bin/bash -c "./build.sh -d"
 

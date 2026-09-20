@@ -99,7 +99,7 @@ The package provides a single ROS node: `thrust_mapper`.
 ### Building
 
 	source /opt/ros/humble/setup.bash
-	cd <AUV-2026>/ros2_ws
+	cd <AUV>/ros2_ws
 	colcon build --symlink-install
 
 After build is complete, make the packages visible to ROS
