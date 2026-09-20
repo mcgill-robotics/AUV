@@ -66,6 +66,7 @@ $RECYCLE.BIN/
 *.onnx
 # TensorRT engine files
 *.engine
+*.plan
 *.md5
 
 #xsens ros2 driver lib 
@@ -84,3 +85,4 @@ core.*
 *.db3
 rosbags/**/*.yaml
 *.zip
+.isaac-ros-cli/

@@ -12,8 +12,42 @@ from geometry_msgs.msg import PoseStamped, Quaternion
 from tf_transformations import euler_matrix, quaternion_from_matrix
 import torch
 
-# Enable CUDA Graphs globally (Native TRT only, ignored by ONNX)
-os.environ["ENABLE_AUTO_CUDA_GRAPHS_FOR_TRT_BACKEND"] = "True"
+# Disable PyTorch CUDA graphs for TRT backend (PyTorch wheel lacks sm_87 kernels for graph capture)
+os.environ["ENABLE_AUTO_CUDA_GRAPHS_FOR_TRT_BACKEND"] = "False"
+
+
+def _patch_inference_models_trt_postprocess():
+    """
+    On Jetson Orin (sm_87) with PyTorch wheels lacking sm_87 kernels,
+    inference_models' TRT post-processing (sigmoid, topk) trips when executed on CUDA.
+    Routing post-processing tensors through CPU avoids the CUDA kernel error while
+    allowing the heavy model forward pass to run at full speed on the TensorRT GPU engine.
+    """
+    try:
+        import inference_models.models.rfdetr.common as rf_common
+        import inference_models.models.rfdetr.optimization.postprocessors.base as post_base
+
+        if getattr(rf_common, "_auv_cpu_patched", False):
+            return
+
+        orig_fn = rf_common.post_process_object_detection_results
+
+        def patched_post_process(bboxes, logits, pre_processing_meta, threshold, num_classes, classes_re_mapping, device):
+            return orig_fn(
+                bboxes.cpu(),
+                logits.cpu(),
+                pre_processing_meta,
+                threshold.cpu() if isinstance(threshold, torch.Tensor) else threshold,
+                num_classes,
+                classes_re_mapping,
+                torch.device("cpu"),
+            )
+
+        rf_common.post_process_object_detection_results = patched_post_process
+        post_base.post_process_object_detection_results = patched_post_process
+        rf_common._auv_cpu_patched = True
+    except Exception:
+        pass
 
 
 def load_model(model_path: str, logger):
@@ -23,12 +57,12 @@ def load_model(model_path: str, logger):
     CUDA Graphs for Native TRT based on model_config.json.
     """
     logger.info(f"Initializing model package from: {model_path}")
+    _patch_inference_models_trt_postprocess()
 
     # 0. Smart Cache Invalidation
-    # Calculate MD5 hash of weights.onnx to detect if the user updated the model.
-    # If the hash changed, purge old .engine files so TensorRT is forced to rebuild.
     onnx_path = os.path.join(model_path, "weights.onnx")
     hash_path = os.path.join(model_path, "weights.md5")
+    engine_plan_path = os.path.join(model_path, "engine.plan")
     
     if os.path.exists(onnx_path):
         try:
@@ -51,6 +85,12 @@ def load_model(model_path: str, logger):
                         logger.info(f"Deleted outdated cache: {os.path.basename(engine_file)}")
                     except Exception as e:
                         logger.warning(f"Failed to delete {engine_file}: {e}")
+                if os.path.exists(engine_plan_path):
+                    try:
+                        os.remove(engine_plan_path)
+                        logger.info(f"Deleted outdated engine.plan: {engine_plan_path}")
+                    except Exception as e:
+                        logger.warning(f"Failed to delete engine.plan: {e}")
                 try:
                     with open(hash_path, "w") as f:
                         f.write(file_hash)
@@ -61,6 +101,28 @@ def load_model(model_path: str, logger):
                     logger.warning(f"Failed to save ONNX hash: {e}")
         except Exception as e:
             logger.warning(f"Failed to perform MD5 hash check: {e}")
+
+    # Ensure engine.plan is compiled if model_config declares backend_type == 'trt'
+    model_config_path = os.path.join(model_path, "model_config.json")
+    is_trt_backend = False
+    if os.path.exists(model_config_path):
+        try:
+            import json
+            with open(model_config_path, "r") as f:
+                m_cfg = json.load(f)
+            is_trt_backend = m_cfg.get("backend_type") == "trt"
+        except Exception:
+            pass
+
+    if is_trt_backend and os.path.exists(onnx_path) and not os.path.exists(engine_plan_path):
+        logger.info(f"Native TRT model requested but {engine_plan_path} missing. Compiling with trtexec...")
+        trt_cfg_path = os.path.join(model_path, "trt_config.json")
+        if not os.path.exists(trt_cfg_path):
+            with open(trt_cfg_path, "w") as f:
+                f.write('{"static_batch_size": 1}\n')
+        ret = os.system(f"trtexec --onnx={onnx_path} --saveEngine={engine_plan_path} --fp16")
+        if ret != 0 or not os.path.exists(engine_plan_path):
+            logger.error(f"Failed to build TensorRT engine with trtexec (return code {ret}).")
 
     # 1. Define our high-performance ONNX settings
     # These are ignored if the model_config.json specifies backend_type: "trt"
@@ -78,17 +140,18 @@ def load_model(model_path: str, logger):
         # It will use what it needs and discard the rest.
         model = AutoModel.from_pretrained(
             model_path,
-            onnx_execution_providers=[trt_ep, "CUDAExecutionProvider"],
+            onnx_execution_providers=[trt_ep, "CPUExecutionProvider"],
             default_onnx_trt_options=False
         )
         
         # 3. Dynamic Warmup Check: 
-        # Only Native TRT models benefit from a warmup to capture the CUDA Graph.
-        # Check the internal backend type of the loaded model.
-        if hasattr(model, 'backend') and model.backend == BackendType.TRT:
-            logger.info("Native TRT detected: Warming up and capturing CUDA Graph...")
-            warmup_image = np.zeros((640, 640, 3), dtype=np.uint8)
+        try:
+            logger.info("Warming up model...")
+            warmup_image = np.zeros((512, 512, 3), dtype=np.uint8)
             model(warmup_image)
+            logger.info("Warmup complete.")
+        except Exception as e:
+            logger.warning(f"Warmup warning: {e}")
             
         logger.info("Model load complete.")
         return model
