@@ -79,16 +79,16 @@ front_cam_object_detection:
     zed_led_status: -1 # -1 leaves the SDK/camera default
 
     # Positional tracking and pose publication parameters
-    pose_source: auv_pose # auv_pose uses state/pose for synchronized detection frames; zed_vio uses the front ZED VIO estimate
+    pose_source: zed_vio # auv_pose uses state/pose for synchronized detection frames; zed_vio uses the front ZED VIO estimate
     auv_pose_topic: state/pose # official aggregated AUV pose used for synchronized detection frames when pose_source=auv_pose
-    enable_vio_pose: false # if false, skip ZED positional tracking and do not publish vision VIO pose/TF
+    enable_vio_pose: true # if false, skip ZED positional tracking and do not publish vision VIO pose/TF
     vio_pose_topic: /vision/vio_pose # optional topic for publishing the ZED VIO pose estimate; only used if pose.vio.enable is true
     broadcast_vio_tf: true # if true and pose.vio.enable is true, publish pool_link -> auv_vio_link TF for visualization/debugging
 
     # Frame names
     global_frame_id: pool_link # world frame for synchronized AUV poses and mapped objects
     auv_frame_id: auv_link # official body frame; sensors/state estimation should own pool_link -> auv_link
-    vio_frame_id: auv_vio_link # debug-only VIO child frame published by vision when enabled
+    vio_frame_id: auv_link #auv_vio_link # debug-only VIO child frame published by vision when enabled
     camera_center_frame_id: zed_camera_center # static camera mount frame under auv_link
     detection_frame_id: zed_left_camera_frame # 3D detection frame used inside VisionDetectionFrame
     image_frame_id: zed_left_camera_frame_optical # optical frame for image-like topics such as CameraInfo and debug feeds
@@ -163,7 +163,7 @@ front_cam_object_detection:
 
     publish_camera_info: true # publish CameraInfo for the front camera feed using ZED left-camera intrinsics
     publish_annotated: true # publishes the front camera feed topic at detection_frame_topic + /annotated, toggled raw/annotated at runtime via service
-    publish_annotated_every_n_frames: 5 # publish annotated image every N detection frames
+    publish_annotated_every_n_frames: 1 # publish annotated image every N detection frames
     publish_depth: true # publish raw 32FC1 depth map image
     publish_depth_compressed: true # publish depth map as compressed 16-bit PNG
     publish_depth_every_n_frames: 5 # publish depth image every N frames

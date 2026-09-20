@@ -52,7 +52,7 @@ fi
 # Get script directory
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # Set ROS distribution and install path
-ROS_DISTRO=humble
+ROS_DISTRO=jazzy
 ROS_INSTALL=/opt/ros/$ROS_DISTRO/setup.bash
 
 # Initialize all git submodules

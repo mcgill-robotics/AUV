@@ -1,39 +1,37 @@
 # ROS 2 Docker Container for Jetson AGX Orin
 
-This repository contains a Dockerized ROS 2 Humble development environment for the **NVIDIA Jetson AGX Orin**, pre-configured with CUDA-accelerated OpenCV, PyTorch, the ZED SDK, and other essential tools. It uses a **two-stage Docker build** for fast iteration.
+This repository contains a Dockerized ROS 2 Jazzy development environment for the **NVIDIA Jetson AGX Orin**, pre-configured with CUDA, PyTorch, the ZED SDK, and other essential tools. It uses an official Isaac ROS foundation plus an AUV-specific image layer.
 
 ## Architecture
 
-The container stack uses two layers:
+The container stack uses three layers:
 
 | Layer | Image | Rebuild Frequency |
 |---|---|---|
-| **Stage 1 (Base)** | `mcgillrobotics/auv_2026:isaac-ros-base` | Once per season / dependency upgrade |
-| **Stage 2 (Application)** | `mcgillrobotics/auv_2026:ros2` | Every code change |
+| **Official foundation** | `mcgillrobotics/isaac-ros-base:r39.2` | Built from NVIDIA's `Dockerfile.isaac_ros` |
+| **AUV base** | `mcgillrobotics/auv_2026:isaac-ros-base` | Dependency upgrades |
+| **Application** | `mcgillrobotics/auv_2026:latest-jetson` | Workspace changes |
 
-**Stage 1 (`Dockerfile.base`)** extends the official NVIDIA Isaac ROS Dev Base image and caches all slow/volatile dependencies:
+**The AUV base (`Dockerfile.base`)** extends the locally built official Isaac ROS image and caches AUV dependencies:
 - OpenCV 4.10 compiled from source with CUDA (Compute Capability 8.7)
 - PyTorch, torchvision, torchaudio from Jetson AI Lab
-- cuSPARSELt + cuDSS
-- ZED SDK 5.1.1 + Python API
-- Custom `cv_bridge` / `vision_opencv` compiled from source against CUDA OpenCV
+- ZED SDK 5.4.1 + Python API
+- Custom `cv_bridge` / `vision_opencv` compiled from source
 - numpy==1.26.4 (tested with ZED + PyTorch)
 
 **Stage 2 (`Dockerfile`)** extends the base image and handles workspace-specific setup (ROS packages, micro-ROS, Foxglove, Python ML deps, user config).
 
-### Isaac ROS Base Image
+### Official Isaac ROS Base Image
 
 ```dockerfile
-# Maps to: Isaac ROS 3.2 + JetPack 6.2 (L4T R36.4.3/R36.4.4)
-# Tag date: 11/12/2025
-# Do NOT upgrade JetPack without updating this tag.
-FROM nvcr.io/nvidia/isaac/ros:aarch64-ros2_humble_4c0c55dddd2bbcc3e8d5f9753bee634c
+FROM nvcr.io/nvidia/base/ubuntu:noble-20251013
 ```
 
 ### Hardware
 - **Hardware:** NVIDIA Jetson AGX Orin
-- **Host OS:** JetPack 6.2 (L4T R36.4.3/R36.4.4), Ubuntu 22.04
-- **ZED SDK:** 5.1.1
+- **Host OS:** JetPack/L4T R39.2, Ubuntu 24.04
+- **ROS:** Jazzy
+- **ZED SDK:** 5.4.1
 
 ## 🚀 Quick Start
 
@@ -52,15 +50,16 @@ FROM nvcr.io/nvidia/isaac/ros:aarch64-ros2_humble_4c0c55dddd2bbcc3e8d5f9753bee63
 
 ## 🏗️ Building
 
-### First Time: Build the Base Image
+### First Time: Build the Images
 
-This only needs to be done once (or when upgrading OpenCV, PyTorch, ZED SDK, etc.).
+The build script fetches NVIDIA's official Isaac ROS CLI repository and builds its Dockerfile directly. It does not install `isaac-ros-cli` on the host.
 
-#### Option A: Standard Build (Default base)
+#### Standard Build
 ```bash
-docker build -f Dockerfile.base -t mcgillrobotics/auv_2026:isaac-ros-base ../../
-docker push mcgillrobotics/auv_2026:isaac-ros-base
+./Docker/jetson/build-images.sh
 ```
+
+The script builds the official foundation, the AUV base, and the application image in that order.
 
 #### Option B: Version-Tagged Base Image (For Archiving / Upgrades)
 If you want to tag the base image with a specific version or date (e.g., `2026-05-21`) to keep an archive:

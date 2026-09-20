@@ -41,7 +41,7 @@ sudo groupmod -g $HOST_VIDEO_GID video 2>/dev/null || sudo groupadd -g $HOST_VID
 sudo usermod -aG render,video douglas
 
 # 5. Source ROS and Workspaces for automated commands (e.g. docker run) that bypass .bashrc
-source /opt/ros/humble/setup.bash
+source /opt/ros/jazzy/setup.bash
 source /opt/ros/micro_ros_ws/install/local_setup.bash
 source /opt/ros/foxglove_ws/install/local_setup.bash
 source /opt/ros/vision_opencv_ws/install/local_setup.bash
