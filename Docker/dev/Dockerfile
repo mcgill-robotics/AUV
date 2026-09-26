@@ -2,7 +2,7 @@
 # Base Image: ROS 2 Jazzy Dev (Ubuntu 24.04)
 # CPU-only development environment without NVIDIA/ZED support
 # ---------------------------------------------------------
-FROM althack/ros2:jazzy-dev
+FROM ros:jazzy
 
 # Get uv
 COPY --from=ghcr.io/astral-sh/uv:0.11.9 /uv /uvx /bin/
@@ -30,6 +30,7 @@ ENV LANG=C.UTF-8 \
 RUN apt-get update && apt-get install -y --no-install-recommends \
     # Build Tools
     apt-utils \
+    software-properties-common \
     build-essential \
     cmake \
     # Version Control
@@ -43,6 +44,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     sudo \
     iputils-ping \
     net-tools \
+    openssh-client \
     # Editors & Terminal
     nano \
     vim \
@@ -55,6 +57,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3-setuptools \
     python3-wheel \
     python3-opencv \
+    python3-argcomplete \
     # ROS Build Tools
     python3-colcon-common-extensions \
     python3-rosdep \
