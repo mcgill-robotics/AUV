@@ -247,11 +247,15 @@ class DownCamObjectDetectorNode():
             self.node.get_logger().fatal(f"Model path does not exist: {model_path}")
             raise FileNotFoundError(f"Model path does not exist: {model_path}")
 
-        if self.enable_object_detection:
+        has_weights = os.path.exists(os.path.join(model_path, "weights.onnx")) or os.path.exists(os.path.join(model_path, "engine.plan"))
+        if self.enable_object_detection and has_weights:
             self.model = load_model(model_path, self.node.get_logger())
         else:
             self.model = None
-            self.node.get_logger().info("Object detection is disabled. Publishing raw feed only.")
+            if self.enable_object_detection:
+                self.node.get_logger().warn(f"Model weights not found in {model_path} (placeholder detected). Publishing raw feed only.")
+            else:
+                self.node.get_logger().info("Object detection is disabled. Publishing raw feed only.")
 
         # ── Publishers ───────────────────────────────────────────
         self.pub_detections = self.node.create_publisher(
@@ -551,7 +555,7 @@ class DownCamObjectDetectorNode():
                 self.node.get_logger().debug(f"Saved {filepath}")
 
         # ── Inference ─────────────────────────────────────
-        if self.enable_object_detection:
+        if self.enable_object_detection and self.model is not None:
             tracked_detections = get_detections(self, img)
         else:
             tracked_detections = None

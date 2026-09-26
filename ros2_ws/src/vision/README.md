@@ -407,10 +407,12 @@ A model package directory must contain:
 
 | File | Purpose |
 |------|---------|
-| `model_config.json` | Architecture (`yolov11`, `rfdetr`), task type, backend (`onnx` or `trt`) |
+| `model_config.json` | Architecture (`yolov11`, `rfdetr`), task type, backend (`trt` or `onnx`) |
+| `trt_config.json` | Required when `backend_type: "trt"` (e.g. `{"static_batch_size": 1}`) |
 | `inference_config.json` | Input preprocessing: resolution, color mode, resize strategy, pixel scaling, and normalization. Also post-processing settings like NMS thresholds for YOLO |
 | `class_names.txt` | One class label per line, order matches the model output indices |
 | `weights.onnx` | ONNX weights file (`.placeholder` in templates, replaced with real weights after export) |
+| `engine.plan` | Native TensorRT GPU engine compiled for the Orin GPU (`sm_87`) |
 
 The two templates under `models/` show the required layout:
 
@@ -421,10 +423,53 @@ The `inference-models` library handles all preprocessing and postprocessing auto
 
 > **Do not delete the template folders.** They are the reference for how to package a new model for deployment. To deploy a new model, copy the matching template, replace `weights.onnx.placeholder` with the real weights, and update `class_names.txt` if needed.
 
+### Building the TensorRT Engine (`engine.plan`) from ONNX
+
+TensorRT engines are device-specific: an `engine.plan` compiled for an x86 GPU or a different JetPack version will not load on the Jetson Orin. The engine must be compiled **on the Jetson inside Docker**.
+
+#### Automatic Compilation (On Launch)
+If `model_config.json` is set to `"backend_type": "trt"` and `engine.plan` is missing, `utils.load_model()` will **automatically compile `engine.plan`** using `trtexec` when the vision node starts up. This takes ~2–3 minutes on the first run.
+
+#### Manual Compilation with `trtexec` (Recommended)
+To pre-compile and benchmark the engine before launching ROS nodes:
+
+1. Exec into the running Jetson container:
+   ```bash
+   docker exec -it jetson-douglas-1 bash
+   ```
+2. Navigate to your model folder:
+   ```bash
+   cd /home/douglas/AUV/ros2_ws/src/vision/models/<your_model_dir>
+   ```
+3. Ensure `model_config.json` specifies `"backend_type": "trt"` and `trt_config.json` exists:
+   ```json
+   // model_config.json
+   {
+     "model_type": "rfdetr",
+     "version": "small",
+     "backend_type": "trt"
+   }
+   ```
+   ```json
+   // trt_config.json
+   {
+     "static_batch_size": 1
+   }
+   ```
+4. Compile the engine using `trtexec` with FP16 precision:
+   ```bash
+   trtexec --onnx=weights.onnx --saveEngine=engine.plan --fp16
+   ```
+
+`trtexec` will log layer-by-layer optimization, verify the output bindings (`dets`, `labels`), run an inference benchmark, and save `engine.plan`. The vision pipeline will then load this GPU engine instantly on launch (~15 ms latency per frame).
+
+> [!NOTE]
+> `*.plan` and `*.engine` files are ignored by git in `.gitignore`. Never commit compiled engines to git; always track the source `weights.onnx` and build `engine.plan` on the Jetson.
+
 ## Training And Model Export
 
 The training/export helpers are under:
 - [model_pipeline/README.md](model_pipeline/README.md)
 - [models/export_rfdetr.py](models/export_rfdetr.py)
 
-These tools are not part of the runtime launch path but they produce the deployed model packages under `models/`.
+These tools produce the deployed model packages under `models/`.

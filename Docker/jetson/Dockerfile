@@ -11,13 +11,13 @@ ARG BASE_IMAGE=mcgillrobotics/auv_2026:isaac-ros-base
 FROM ${BASE_IMAGE}
 
 # ROS2 distribution
-ARG ROS2_DIST=humble
+ARG ROS2_DIST=jazzy
 
 # CI has a different runner than the jetson (notably git permissions are different and there is no GPU)
 ARG CI
 
 # Set up pip index as a build argument so it can be updated easily
-ARG JETSON_PIP_INDEX=https://pypi.jetson-ai-lab.io/jp6/cu126
+ARG JETSON_PIP_INDEX=https://pypi.jetson-ai-lab.io/sbsa/cu130
 
 # Set up environment
 ENV CI=${CI} \
@@ -32,6 +32,7 @@ ENV CI=${CI} \
 # =============================================================================
 # copy our configs for zed2i
 COPY Docker/jetson/SN33688213.conf /usr/local/zed/settings/
+
 
 # =============================================================================
 # 2. System Packages
@@ -67,11 +68,14 @@ RUN curl -fsSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -o
     libwayland-dev \
     libxkbcommon-dev \
     lsb-release \
+    nano \
     ninja-build \
     python3-vcstool \
     python3-wheel \
+    tmux \
     udev \
     usbutils \
+    vim \
     v4l-utils \
     && rm -rf /var/lib/apt/lists/* && apt-get clean
 
@@ -80,10 +84,15 @@ RUN curl -fsSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -o
 # =============================================================================
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ros-$ROS_DISTRO-actionlib-msgs \
+    ros-$ROS_DISTRO-angles \
     ros-$ROS_DISTRO-ament-index-cpp \
+    ros-$ROS_DISTRO-backward-ros \
     ros-$ROS_DISTRO-diagnostic-msgs \
+    ros-$ROS_DISTRO-diagnostic-updater \
     ros-$ROS_DISTRO-eigen3-cmake-module \
+    ros-$ROS_DISTRO-foxglove-bridge \
     ros-$ROS_DISTRO-foxglove-msgs \
+    ros-$ROS_DISTRO-image-transport \
     ros-$ROS_DISTRO-joy \
     ros-$ROS_DISTRO-joy-teleop \
     ros-$ROS_DISTRO-mavros-msgs \
@@ -97,6 +106,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ros-$ROS_DISTRO-py-trees-ros-viewer \
     ros-$ROS_DISTRO-rclcpp \
     ros-$ROS_DISTRO-rclcpp-lifecycle \
+    ros-$ROS_DISTRO-robot-localization \
     ros-$ROS_DISTRO-rosbag2-storage-mcap \
     ros-$ROS_DISTRO-rosidl-default-generators \
     ros-$ROS_DISTRO-tf-transformations \
@@ -132,22 +142,7 @@ RUN git clone -b $ROS_DISTRO https://github.com/micro-ROS/micro_ros_setup.git sr
     rm -rf build src log
 
 # =============================================================================
-# 5. Foxglove Bridge
-# =============================================================================
-WORKDIR /opt/ros/foxglove_ws
-RUN git clone --depth 1 --branch sdk/v0.21.0 https://github.com/foxglove/foxglove-sdk.git src/foxglove-sdk && \
-    apt-get update && \
-    rm -rf /etc/ros/rosdep/sources.list.d/* && \
-    rosdep init && \
-    rosdep update --rosdistro ${ROS_DISTRO} && \
-    rosdep install -y --from-paths src --ignore-src --rosdistro ${ROS_DISTRO} && \
-    . /opt/ros/${ROS_DISTRO}/setup.sh && \
-    colcon build --packages-select foxglove_bridge \
-    --cmake-args -DCMAKE_BUILD_TYPE=Release && \
-    rm -rf build log src /var/lib/apt/lists/*
-
-# =============================================================================
-# 6. Python Dependencies (single layer for both installs)
+# 5. Python Dependencies (single layer for both installs)
 # =============================================================================
 WORKDIR /root
 
@@ -157,7 +152,7 @@ COPY Docker/jetson/requirements.txt Docker/jetson/constraints.txt /tmp/
 # Install Python packages. torch/torchvision/torchaudio and opencv are already
 # in the base image - uv will see them as satisfied and skip them.
 RUN uv pip install \
-    -v \
+    --break-system-packages \
     --index-strategy unsafe-best-match \
     --no-cache \
     --no-build-isolation \
@@ -166,15 +161,16 @@ RUN uv pip install \
     -r /tmp/requirements.txt \
     -c /tmp/constraints.txt && \
     uv pip install \
-    -v \
+    --break-system-packages \
     --extra-index-url ${JETSON_PIP_INDEX} \
     --index-strategy unsafe-best-match \
     --no-deps \
     --system \
-    "inference-models[torch-jp6-cu126,onnx-jp6-cu126]"
+    "inference-models[torch-cu130,onnx-cu130]" && \
+    uv pip uninstall --system tensorrt tensorrt-cu13 tensorrt-cu13-bindings tensorrt-cu13-libs 2>/dev/null || true
 
 # =============================================================================
-# 7. User Setup + Entrypoint (consolidated to reduce layers)
+# 6. User Setup + Entrypoint (consolidated to reduce layers)
 # =============================================================================
 ARG USERNAME=douglas
 ARG USER_UID=1000
@@ -187,7 +183,11 @@ RUN if getent group $USER_GID; then \
     else \
         groupadd --gid $USER_GID $USERNAME; \
     fi && \
-    useradd --uid $USER_UID --gid $USER_GID -m -s /bin/bash $USERNAME && \
+    if getent passwd $USER_UID; then \
+        usermod -l $USERNAME -m -d /home/$USERNAME $(getent passwd $USER_UID | cut -d: -f1); \
+    else \
+        useradd --uid $USER_UID --gid $USER_GID -m -s /bin/bash $USERNAME; \
+    fi && \
     echo $USERNAME ALL=\(root\) NOPASSWD:ALL > /etc/sudoers.d/$USERNAME && \
     chmod 0440 /etc/sudoers.d/$USERNAME && \
     usermod -aG video,render,dialout -s /bin/bash $USERNAME && \
@@ -210,14 +210,13 @@ ENV COLCON_HOME=/home/$USERNAME/.colcon
 COPY .colcon ${COLCON_HOME}/
 
 # Create ultralytics config dir and set up bashrc in one layer
-WORKDIR /home/$USERNAME/AUV-2026
+WORKDIR /home/$USERNAME/AUV
 RUN mkdir -p /home/$USERNAME/.config/Ultralytics && \
     { \
-        echo "source /opt/ros/humble/setup.bash"; \
+        echo "source /opt/ros/jazzy/setup.bash"; \
         echo "source /opt/ros/micro_ros_ws/install/local_setup.bash"; \
-        echo "source /opt/ros/foxglove_ws/install/local_setup.bash"; \
         echo "source /opt/ros/vision_opencv_ws/install/local_setup.bash"; \
-        echo "source /home/$USERNAME/AUV-2026/ros2_ws/install/setup.bash"; \
+        echo "if [ -f /home/$USERNAME/AUV/ros2_ws/install/setup.bash ]; then source /home/$USERNAME/AUV/ros2_ws/install/setup.bash; fi"; \
     } >> ~/.bashrc
 
 # Entrypoint to fix Group IDs to allow GPU access

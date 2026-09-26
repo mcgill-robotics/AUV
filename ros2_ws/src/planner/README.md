@@ -104,7 +104,7 @@ Note that while `sim` and `use_ground_truth` can be toggled via launch arguments
      - `Doppler Velocity`
      - `Depth Sensor`
 2. **Setup Environment**:
-   - Follow the steps in [AUV-2026/Docker/dev](../../../Docker/dev/README.md) to start the development environment.
+   - Follow the steps in [AUV/Docker/dev](../../../Docker/dev/README.md) to start the development environment.
 3. **Build & Source**:
    - Build the project in the root directory and source the workspace:
 ```bash

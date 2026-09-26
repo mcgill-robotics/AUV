@@ -62,7 +62,7 @@ Running the Python scripts directly provides maximum modularity and makes debugg
    *(For segmentation: append `--task segment`)*
    Not needed, good to monitor training metrics.
    ```bash
-   python3 -m tensorboard.main --logdir /home/douglas/AUV-2026/ros2_ws/src/vision/model_pipeline/runs/rfdetr
+   python3 -m tensorboard.main --logdir /home/douglas/AUV/ros2_ws/src/vision/model_pipeline/runs/rfdetr
    ```
 
 *(Alternatively, you can run the automated script: `./training.sh --mode synthetic --model-type rfdetr`)*
@@ -96,7 +96,7 @@ After running the command, simply drag the generated `my_raw_images_prelabeled` 
     1. Do **NOT** add any pre-processing or augmentation steps in Roboflow; native PyTorch dataloaders heavily handle mosaic, jitter, and scaling dynamically during actual training.
 4. **Download Dataset to Machine**
     1. Select export format **YOLOv11** (even if using RF-DETR, because our script organizes everything automatically!).
-    2. Download the zip and extract its contents (`images/`, `labels/`, `data.yaml`) into `AUV-2026/ros2_ws/src/vision/model_pipeline/data/raw_import/`.
+    2. Download the zip and extract its contents (`images/`, `labels/`, `data.yaml`) into `AUV/ros2_ws/src/vision/model_pipeline/data/raw_import/`.
 5. **Undo Roboflow Shenanigans**
     1. Roboflow sometimes re-orders the labels in alphabetical order. To undo this and perfectly map everything to the correct targets (as defined in `classes.yaml`), simply run the `fix_labels.py` script.
     2. Run `python3 fix_labels.py --data-dir data/raw_import`. The script will automatically read the target labels from `classes.yaml` and the current labels from your Roboflow `data.yaml`, then correctly remap your dataset indices
@@ -112,21 +112,38 @@ After running the command, simply drag the generated `my_raw_images_prelabeled` 
     2. RF-DETR outputs generally save to: `runs/rfdetr/best_rf_detr_small_model.pth`
 
 
-## 4. Optimize the model
-Run this **ON THE JETSON**: 
+## 4. Optimize the model (TensorRT on Jetson)
+
+TensorRT engines (`engine.plan`) must be compiled **ON THE JETSON inside the Docker container** so that they target the Orin GPU architecture (`sm_87`).
+
+### 4.1 RF-DETR (Export to ONNX, then Compile to TensorRT)
+
+1. **Export the fine-tuned PyTorch checkpoint (`.pth`) to ONNX (`weights.onnx`):**
+   ```bash
+   python3 ../models/export_rfdetr.py --model runs/rfdetr/best_rf_detr_small_model.pth --size s --task detect
+   ```
+   *(Or with `--task segment` for segmentation).*
+
+2. **Move files into your deployment model package directory:**
+   Copy the generated `weights.onnx` into `ros2_ws/src/vision/models/<your_model_package>/` (e.g. `real_front_cam_rfdetr_onnx/`).
+
+3. **Compile the native TensorRT engine (`engine.plan`):**
+   ```bash
+   cd /home/douglas/AUV/ros2_ws/src/vision/models/<your_model_package>
+   trtexec --onnx=weights.onnx --saveEngine=engine.plan --fp16
+   ```
+
+4. **Verify package configuration:**
+   - In `model_config.json`, ensure: `"backend_type": "trt"`
+   - Ensure `trt_config.json` exists with: `{"static_batch_size": 1}`
+
+### 4.2 YOLO
 
 ```bash
 yolo export model=<path_to_model.pt> format=engine half=True imgsz=640 nms=True
 ```
 
-Running this inside the jetson docker container will optimize the model to run on the jetson's GPU:
-- `model`: path to the pytorch model you want to optimize
-- `format`: set to engine for TensorRT engine format
-- `half`: use half precision (FP16) for which the jetson has optimized performance
-- `imgsz`: image size for the model (should be the same as what you trained on)
-- `nms`: whether to include non-max suppression in the exported model (should be True for deployment to offload CPU work to the GPU)
-
-The model is now ready for the vision pipeline!
+The resulting `engine.plan` (or `.engine`) runs directly on the Jetson Orin GPU with ~15 ms latency!
 
 ## Training Advanced Usage
 
