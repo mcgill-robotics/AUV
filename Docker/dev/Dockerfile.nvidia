@@ -151,6 +151,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         python3-colcon-common-extensions \
         python3-rosdep \
         python3-vcstool \
+        libnvinfer-bin \
         && rm -rf /var/lib/apt/lists/*
 
 # ----------------------------------------------------------
@@ -234,8 +235,8 @@ COPY Docker/dev/requirements.txt Docker/dev/constraints.txt /tmp/
 RUN --mount=type=cache,target=/root/.cache/uv \
         uv pip install --break-system-packages -c /tmp/constraints.txt -r /tmp/requirements.txt
 
-# Install inference-models with TRT10 extra for GPU-accelerated inference
-RUN uv pip install --break-system-packages onnxruntime-gpu "inference-models[torch-cu130,onnx-cu130]" -c /tmp/constraints.txt
+# Install inference-models with TRT10/11 extra for GPU-accelerated inference
+RUN uv pip install --break-system-packages onnxruntime-gpu tensorrt "inference-models[torch-cu130,onnx-cu130]" -c /tmp/constraints.txt
 
 # Install ZED Python API from source
 RUN git clone -b v${ZED_SDK_MAJOR}.${ZED_SDK_MINOR}.${ZED_SDK_PATCH} https://github.com/stereolabs/zed-python-api.git /tmp/zed-python-api && \
@@ -260,7 +261,7 @@ RUN if getent group $USER_GID; then \
         # 2. Create the user
         echo $USERNAME ALL=\(root\) NOPASSWD:ALL > /etc/sudoers.d/$USERNAME \
         && chmod 0440 /etc/sudoers.d/$USERNAME \
-        && usermod -aG video,render,dialout -s /bin/bash $USERNAME
+        && usermod -aG video,render,dialout,zed -s /bin/bash $USERNAME
 
 # Install fixuid for dynamic UID/GID remapping at runtime
 ARG FIXUID_VERSION=0.6.0
