@@ -1,18 +1,15 @@
 # ---------------------------------------------------------
 # Build Arguments
 # ---------------------------------------------------------
-ARG CUDA_MAJOR=12
-ARG CUDA_MINOR=6
-ARG CUDA_PATCH=2
-ARG UBUNTU_RELEASE=22
+ARG CUDA_MAJOR=13
+ARG CUDA_MINOR=0
+ARG CUDA_PATCH=0
+ARG UBUNTU_RELEASE=24
 
 # ---------------------------------------------------------
-# Base Image: NVIDIA CUDA Devel
-# We use 'devel' because we need 'nvcc' to compile ZED ROS2 Wrapper
+# Base Image: We use our own custom compiled openCV base image
 # ---------------------------------------------------------
-# ARG BASE_IMAGE=nvidia/cuda:${CUDA_MAJOR}.${CUDA_MINOR}.${CUDA_PATCH}-devel-ubuntu${UBUNTU_RELEASE}.04
-# FROM ${BASE_IMAGE}
-FROM tuttelikz/opencv-cuda:4.10.0-cuda12.6.3-arch8.9-ubuntu22.04
+FROM mcgillrobotics/auv_2026:dev-opencv-base
 
 # Get uv
 COPY --from=ghcr.io/astral-sh/uv:0.11.9 /uv /uvx /bin/
@@ -26,20 +23,20 @@ ENV LD_LIBRARY_PATH=${CUDA_ROOT}/lib64:${LD_LIBRARY_PATH}
 
 # all arguments after pulling from base image are flushed, so we re-declare them
 ARG ZED_SDK_MAJOR=5
-ARG ZED_SDK_MINOR=1
-ARG ZED_SDK_PATCH=1
-ARG CUDA_MAJOR=12
-ARG CUDA_MINOR=8
-ARG UBUNTU_RELEASE=22
+ARG ZED_SDK_MINOR=4
+ARG ZED_SDK_PATCH=0 
+ARG CUDA_MAJOR=13
+ARG CUDA_MINOR=0
+ARG UBUNTU_RELEASE=24
 ARG UBUNTU_MINOR_RELEASE=04
 ARG TENSORRT_MAJOR=10
-ARG TENSORRT_MINOR=9
+ARG TENSORRT_MINOR=13
 
 # Set environment variables
 ENV LANG=C.UTF-8 \
         LC_ALL=C.UTF-8 \
         DEBIAN_FRONTEND=noninteractive \
-        ROS_DISTRO=humble \
+        ROS_DISTRO=jazzy \
         # Critical for ZED SDK to access hardware
         NVIDIA_DRIVER_CAPABILITIES=all \
         TZ=Europe/Paris \
@@ -83,11 +80,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         usbutils \
         v4l-utils \
         # GUI Support (RQT/Rviz)
-        libgl1-mesa-glx \
-        libgl1-mesa-dri \
+	libgl1 \
+        libglx-mesa0 \
+	libgl1-mesa-dri \
         && rm -rf /var/lib/apt/lists/*
 
-# Add ROS 2 Humble Repository
+# Add ROS 2 Jazzy Repository
 RUN curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -o /usr/share/keyrings/ros-archive-keyring.gpg && \
         echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $(lsb_release -cs) main" | tee /etc/apt/sources.list.d/ros2.list > /dev/null
 # Note that the CI does not have access to NVIDIA hardware, so we manually install the stubs only on CI to satisfy the linker when building ZED dependent packages
@@ -95,13 +93,13 @@ ARG CI
 RUN if [ "$CI" = "true" ]; then \
         echo "Installing ZED stubs for CI"; \
         # Install CUDA keyring to access NVIDIA packages (needed for stubs), sed to remove '.' 22.04 -> 2204
-        curl -fsSL https://developer.download.nvidia.com/compute/cuda/repos/ubuntu${UBUNTU_RELEASE}${UBUNTU_MINOR_RELEASE}/x86_64/cuda-keyring_1.1-1_all.deb -o /tmp/cuda-keyring.deb && \
-        sudo dpkg -i /tmp/cuda-keyring.deb && \
+        #curl -fsSL https://developer.download.nvidia.com/compute/cuda/repos/ubuntu${UBUNTU_RELEASE}${UBUNTU_MINOR_RELEASE}/x86_64/cuda-keyring_1.1-1_all.deb -o /tmp/cuda-keyring.deb && \
+        #sudo dpkg -i /tmp/cuda-keyring.deb && \
         # Install NVIDIA driver stubs (allows linker to find CUDA symbols when building ZED dependent packages, even though we won't actually be able to run them in CI). There is a third package 'libcuda.so' but it these two depend on libcuda and so apt installs it for us
         apt-get update && apt-get install -y \
         libnvidia-decode-550 \
         libnvidia-encode-550 && \
-        rm /tmp/cuda-keyring.deb && \
+        #rm /tmp/cuda-keyring.deb && \
         rm -rf /var/lib/apt/lists/* && \
         apt-get clean; \
         else \
@@ -153,6 +151,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         python3-colcon-common-extensions \
         python3-rosdep \
         python3-vcstool \
+        libnvinfer-bin \
         && rm -rf /var/lib/apt/lists/*
 
 # ----------------------------------------------------------
@@ -215,33 +214,33 @@ RUN cd /tmp && ./${ZED_SDK_RUN} silent skip_cuda skip_python && \
 # Fake opencv-python
 RUN mkdir -p /tmp/fake_cv && \
         echo 'from setuptools import setup; setup(name="opencv-python", version="4.10.0", packages=[])' > /tmp/fake_cv/setup.py && \
-        uv pip install /tmp/fake_cv && \
+        uv pip install --break-system-packages /tmp/fake_cv && \
         rm -rf /tmp/fake_cv
 
 # Fake opencv-contrib-python
 RUN mkdir -p /tmp/fake_cv_contrib && \
         echo 'from setuptools import setup; setup(name="opencv-contrib-python", version="4.10.0", packages=[])' > /tmp/fake_cv_contrib/setup.py && \
-        uv pip install /tmp/fake_cv_contrib && \
+        uv pip install --break-system-packages /tmp/fake_cv_contrib && \
         rm -rf /tmp/fake_cv_contrib
 
 # Fake opencv-python-headless
 RUN mkdir -p /tmp/fake_cv_headless && \
         echo 'from setuptools import setup; setup(name="opencv-python-headless", version="4.10.0", packages=[])' > /tmp/fake_cv_headless/setup.py && \
-        uv pip install /tmp/fake_cv_headless && \
+        uv pip install --break-system-packages /tmp/fake_cv_headless && \
         rm -rf /tmp/fake_cv_headless
 
 # Install actual requirements
 # Ensure Docker/dev/constraints.txt DOES NOT contain opencv lines
 COPY Docker/dev/requirements.txt Docker/dev/constraints.txt /tmp/
 RUN --mount=type=cache,target=/root/.cache/uv \
-        uv pip install -c /tmp/constraints.txt -r /tmp/requirements.txt
+        uv pip install --break-system-packages -c /tmp/constraints.txt -r /tmp/requirements.txt
 
-# Install inference-models with TRT10 extra for GPU-accelerated inference
-RUN uv pip install onnxruntime-gpu "inference-models[torch-cu126,onnx-cu12,trt10]" -c /tmp/constraints.txt
+# Install inference-models with TRT10/11 extra for GPU-accelerated inference
+RUN uv pip install --break-system-packages onnxruntime-gpu tensorrt "inference-models[torch-cu130,onnx-cu130]" -c /tmp/constraints.txt
 
 # Install ZED Python API from source
 RUN git clone -b v${ZED_SDK_MAJOR}.${ZED_SDK_MINOR}.${ZED_SDK_PATCH} https://github.com/stereolabs/zed-python-api.git /tmp/zed-python-api && \
-        uv pip install -v --no-deps --no-build-isolation /tmp/zed-python-api/src && \
+        uv pip install --break-system-packages -v --no-deps --no-build-isolation /tmp/zed-python-api/src && \
         rm -rf /tmp/zed-python-api
 
 ARG USERNAME=douglas
@@ -253,12 +252,16 @@ RUN if getent group $USER_GID; then \
         groupmod -n $USERNAME $(getent group $USER_GID | cut -d: -f1); \
         else \
         groupadd --gid $USER_GID $USERNAME; \
-        fi \
+        fi && \
+        if getent passwd $USER_UID; then \
+        usermod -l $USERNAME -m -d /home/$USERNAME $(getent passwd $USER_UID | cut -d: -f1); \
+        else \
+        useradd --uid $USER_UID --gid $USER_GID -m -s /bin/bash $USERNAME; \
+        fi && \
         # 2. Create the user
-        && useradd --uid $USER_UID --gid $USER_GID -m -s /bin/bash $USERNAME \
-        && echo $USERNAME ALL=\(root\) NOPASSWD:ALL > /etc/sudoers.d/$USERNAME \
+        echo $USERNAME ALL=\(root\) NOPASSWD:ALL > /etc/sudoers.d/$USERNAME \
         && chmod 0440 /etc/sudoers.d/$USERNAME \
-        && usermod -aG video,render,dialout -s /bin/bash $USERNAME
+        && usermod -aG video,render,dialout,zed -s /bin/bash $USERNAME
 
 # Install fixuid for dynamic UID/GID remapping at runtime
 ARG FIXUID_VERSION=0.6.0
