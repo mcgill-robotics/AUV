@@ -3,6 +3,7 @@ services:
   # SERVICE 1: CPU-Only (Universal)
   # ==========================================
   cpu:
+    platform: linux/amd64
     build:
       context: ../../
       dockerfile: Docker/dev/Dockerfile
@@ -41,6 +42,7 @@ services:
   # SERVICE 2: NVIDIA GPU (Accelerated)
   # ==========================================
   nvidia:
+    platform: linux/amd64
     build:
       context: ../../
       dockerfile: Docker/dev/Dockerfile.nvidia

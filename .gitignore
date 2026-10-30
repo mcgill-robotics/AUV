@@ -86,3 +86,12 @@ core.*
 rosbags/**/*.yaml
 *.zip
 .isaac-ros-cli/
+
+# Personal dev environment (Charles) — not shared with the team
+Docker/dev/Dockerfile.personal
+Docker/dev/docker-compose.override.yml
+Docker/dev/personal.zshrc
+Docker/dev/personal.p10k.zsh
+Docker/dev/personal.gitconfig
+Docker/dev/personal-yazi-theme.toml
+.zed/

@@ -36,5 +36,5 @@
             ]
         }
     },
-    "postCreateCommand": "sudo chown -R douglas:douglas /home/douglas/AUV",    
+    "postCreateCommand": ["sudo", "chown", "-R", "douglas:douglas", "/home/douglas/AUV"]
 }
