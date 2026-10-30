@@ -33,9 +33,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     software-properties-common \
     build-essential \
     cmake \
-    # Autocomplete tools
-    git-core \ 
-    bash-completion \
     # Version Control
     git \
     git-lfs \
@@ -91,6 +88,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     # Navigation & Localization
     ros-${ROS_DISTRO}-mavros \
     ros-${ROS_DISTRO}-mavros-msgs \
+    ros-${ROS_DISTRO}-nav2-bringup \
     ros-${ROS_DISTRO}-robot-localization \
     ros-${ROS_DISTRO}-nmea-msgs \
     ros-${ROS_DISTRO}-marine-sensor-msgs \
@@ -165,14 +163,15 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 # ---------------------------------------------------------
 # 3. Environment Setup
 # ---------------------------------------------------------
+# The base image already has a 'ros' user with sudo. 
 ARG USERNAME=douglas
 ARG USER_UID=1000
 ARG USER_GID=$USER_UID
 
-# Add the douglas user and group
+# Rename the default 'ros' user to our desired username/uid
 # We keep UID 1000 to match host permissions
-RUN groupmod --gid $USER_GID --new-name $USERNAME ubuntu \
-    && usermod --uid $USER_UID --gid $USER_GID --login $USERNAME --move-home --home /home/$USERNAME ubuntu \
+RUN groupmod --gid $USER_GID --new-name $USERNAME ros \
+    && usermod --uid $USER_UID --gid $USER_GID --login $USERNAME --move-home --home /home/$USERNAME ros \
     && echo $USERNAME ALL=\(root\) NOPASSWD:ALL > /etc/sudoers.d/$USERNAME \
     && chmod 0440 /etc/sudoers.d/$USERNAME \
     && groupadd -f -r render \
@@ -187,9 +186,6 @@ RUN ARCH="$(dpkg --print-architecture)" && \
     chmod 4755 /usr/local/bin/fixuid && \
     mkdir -p /etc/fixuid && \
     printf "user: $USERNAME\ngroup: $USERNAME\n" > /etc/fixuid/config.yml
-
-# Add autocomplete for the user 
-RUN echo "if [ -f /usr/share/colcon_argcomplete/hook/colcon-argcomplete.bash ]; then source /usr/share/colcon_argcomplete/hook/colcon-argcomplete.bash; fi" >> /home/$USERNAME/.bashrc
 
 # Copy entrypoint
 COPY Docker/entrypoint.sh /usr/local/bin/entrypoint.sh
