@@ -14,6 +14,8 @@ from .debugNavigation.test_style_yaw_spin import TestStyleYawSpin
 from .debugNavigation.test_style_rolling_flip import TestStyleRollingFlip
 from .debugNavigation.test_grabber_behaviour import TestGrabberBehaviour
 from .debugNavigation.test_torpedo_behaviour import TestTorpedoBehaviour
+from .test.test_square_look_at_center_behaviour import TestSquareLookAtCenterBehaviour
+from .debugNavigation.test_move_forward_behaviour import TestMoveForwardBehaviour
 
 # --- NEW ROBOSUB 2026 TASKS ---
 from .robosub2026.gate_task import GateTask
@@ -85,7 +87,10 @@ class MissionSpawner(py_trees.behaviour.Behaviour):
                     " 17: Table & Octagon Task\n"
                     " 18: Return Home Task\n"
                     "--- Full Run ---\n"
-                    " 19: FULL COMPETITION RUN"
+                    " 19: FULL COMPETITION RUN\n"
+                    "--- Test Charles ---\n"
+                    " 20: TestSquareLookAtCenterBehaviour\n"
+                    " 21: TestMoveForwardBehaviour"
                 )
                 self.node.get_logger().info(menu_text)
                 self.message_shown = True
@@ -206,6 +211,10 @@ class MissionSpawner(py_trees.behaviour.Behaviour):
                 py_trees.decorators.FailureIsSuccess(name="Resilient Return Home Task", child=ReturnHomeTask(**return_home))
             ])
             return full_run
+        elif choice == 20:
+            return TestSquareLookAtCenterBehaviour(p['position_tolerance'], p['angular_tolerance'], p['hold_time'], p['timeout'])
+        elif choice == 21:
+            return TestMoveForwardBehaviour(p['position_tolerance'], p['hold_time'], p['timeout'])
         return None
 
 class DynamicMissionSequence(py_trees.composites.Sequence):
