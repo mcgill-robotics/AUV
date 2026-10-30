@@ -98,7 +98,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ros-$ROS_DISTRO-mavros-msgs \
     ros-$ROS_DISTRO-message-filters \
     ros-$ROS_DISTRO-nav-msgs \
-    ros-$ROS_DISTRO-nav2-bringup \
     ros-$ROS_DISTRO-nmea-msgs \
     ros-$ROS_DISTRO-py-trees \
     ros-$ROS_DISTRO-py-trees-ros \
