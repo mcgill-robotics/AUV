@@ -3,6 +3,7 @@
 views {
   view mapDeep of auv.vision.map {
     title '8. object_map: detections to a persistent map'
+    description 'Detections move into pool_link, get tracked, and are published. Unique objects stay.'
     autoLayout LeftRight
     include auv.vision.map.*
     include auv.vision.map.tracker with {
@@ -13,6 +14,7 @@ views {
 
   view frontDeep of auv.vision.front {
     title '9. front_cam_object_detection: image to 3D detections'
+    description 'One frame: capture, pose snapshot, detect, locate in 3D, publish.'
     autoLayout LeftRight
     include auv.vision.front.*
     include zed, auv.sensors, auv.vision.map, auv.models
@@ -20,6 +22,7 @@ views {
 
   view stateAggDeep of auv.sensors.stateAgg {
     title '10. state_aggregator: three inputs, one pose'
+    description 'Orientation from the IMU, z from depth, x and y from the DVL.'
     autoLayout LeftRight
     include auv.sensors.stateAgg.*
     include auv.sensors.imuProc, auv.sensors.depthProc, auv.sensors.dvlProc

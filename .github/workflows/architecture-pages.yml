@@ -36,7 +36,7 @@ jobs:
       - run: npm ci
       - run: npm run validate
       # Pages serves the site under /<repo name>/. Hash history avoids 404s on deep links and refresh.
-      - run: npx likec4 build -o dist --base "/${{ github.event.repository.name }}/" --use-hash-history
+      - run: npx likec4 build -o dist --base "/${{ github.event.repository.name }}/" --use-hash-history --title "AUV architecture"
       - uses: actions/upload-pages-artifact@v3
         with:
           path: docs/architecture/likec4/dist

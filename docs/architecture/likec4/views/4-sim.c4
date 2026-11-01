@@ -1,6 +1,7 @@
 views {
   view simOverview of sim {
     title '11. Unity simulator'
+    description 'The simulator stands in for the pool, the vehicle and its sensors.'
     autoLayout LeftRight
     include sim.*
     include auv.tcp, zed, training.datasets
@@ -16,6 +17,7 @@ views {
 
   view synthTraining {
     title '13. Synthetic data and training: images to a model'
+    description 'Unity makes labelled images. The training pipeline turns them into a TensorRT model.'
     autoLayout LeftRight
     include sim.synth.*, sim.solo, sim.converter
     include training.*, roboflow, auv.models, auv.vision.front

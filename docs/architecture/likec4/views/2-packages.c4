@@ -3,6 +3,7 @@
 views {
   view sensorsDeep of auv.sensors {
     title '4. sensors: raw readings to one pose'
+    description 'IMU, DVL and depth are each converted into the AUV frame, then fused into state/pose.'
     autoLayout LeftRight
     include auv.sensors.*
     include auv.drivers, auv.controls
@@ -27,12 +28,14 @@ views {
 
   view visionDeep of auv.vision {
     title '6. vision: pixels to a map'
+    description 'Two cameras are detected, located, tracked and merged into one persistent map.'
     include auv.vision.*
     include zed, hw.downCam, auv.models, auv.sensors, auv.planner
   }
 
   view plannerDeep of auv.planner {
     title '7. planner: reading the world, sending goals'
+    description 'A behaviour tree reads the world from a blackboard and sends navigate goals.'
     autoLayout LeftRight
     include auv.planner.*, auv.planner.tasks.*
     include auv.sensors, auv.vision, auv.controls, auv.drivers
