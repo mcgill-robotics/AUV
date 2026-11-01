@@ -1,0 +1,52 @@
+name: Architecture diagrams
+
+# Builds the LikeC4 diagrams in docs/architecture/likec4 and publishes them to GitHub Pages.
+# One-time setup by a repo admin: Settings > Pages > Source: "GitHub Actions".
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - "docs/architecture/**"
+      - ".github/workflows/architecture-pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: docs/architecture/likec4
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: docs/architecture/likec4/package-lock.json
+      - run: npm ci
+      - run: npm run validate
+      # Pages serves the site under /<repo name>/. Hash history avoids 404s on deep links and refresh.
+      - run: npx likec4 build -o dist --base "/${{ github.event.repository.name }}/" --use-hash-history
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs/architecture/likec4/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

@@ -1,0 +1,53 @@
+// sensors: every sensor is converted once into the AUV frame, then fused.
+model {
+  extend auv.sensors {
+    imuProc = component 'imu_processor' {
+      summary 'Rotates the IMU into the AUV frame. Fixes yaw drift with the DVL.'
+      description '
+        In: imu/data (Imu), dvl/dead_reckoning (DVLDR).
+        Out: auv_frame/imu (Imu).
+        A complementary filter pulls yaw toward the DVL yaw, so the IMU heading does not drift.
+      '
+      technology 'C++'
+    }
+    depthProc = component 'depth_processor' {
+      summary 'Depth sensor to AUV depth, with lever-arm correction.'
+      description '
+        In: /sensors/depth/z (Float64), auv_frame/imu.
+        Out: auv_frame/depth (Float64). Negative below the surface.
+        The sensor sits off-centre, so a tilted vehicle would read a wrong depth. The IMU orientation fixes that.
+        Service /depth_processor/calibrate zeros it at the surface.
+      '
+      technology 'C++'
+    }
+    dvlProc = component 'dvl_processor' {
+      summary 'Rotates DVL velocity and position into the AUV frame.'
+      description '
+        In: dvl/velocity, dvl/dead_reckoning, auv_frame/imu.
+        Out: auv_frame/dvl/position (PointStamped), auv_frame/dvl/velocity (TwistStamped).
+        Uses the DVL mounting offset and rotation from sensors_frames.yaml.
+      '
+      technology 'C++'
+    }
+    stateAgg = component 'state_aggregator' {
+      summary 'Fuses everything into one pose, state/pose, at 50 Hz.'
+      description '
+        In: auv_frame/imu, auv_frame/depth, auv_frame/dvl/*.
+        Out: state/pose (PoseStamped), optional TF.
+        Position x,y from the DVL, z from depth, orientation from the IMU.
+        It also subscribes to front_cam/vio/pose, but the VIO flags are off by default.
+      '
+      technology 'C++'
+    }
+    health = component 'health monitors' {
+      summary 'Watch IMU and DVL rates and publish /diagnostics.'
+      technology 'Python'
+    }
+  }
+
+  auv.sensors.imuProc -> auv.sensors.depthProc 'auv_frame/imu'
+  auv.sensors.imuProc -> auv.sensors.dvlProc 'auv_frame/imu'
+  auv.sensors.imuProc -> auv.sensors.stateAgg 'auv_frame/imu'
+  auv.sensors.depthProc -> auv.sensors.stateAgg 'auv_frame/depth'
+  auv.sensors.dvlProc -> auv.sensors.stateAgg 'auv_frame/dvl/*'
+}

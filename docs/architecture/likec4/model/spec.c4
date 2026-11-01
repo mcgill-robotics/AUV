@@ -1,0 +1,35 @@
+specification {
+  element actor {
+    style {
+      shape person
+      color sky
+    }
+  }
+  element system
+  element external {
+    style {
+      color muted
+    }
+  }
+  element device {
+    style {
+      color muted
+      shape rectangle
+    }
+  }
+  element app
+  element store {
+    style {
+      shape storage
+      color green
+    }
+  }
+  element component {
+    style {
+      color indigo
+    }
+  }
+
+  tag sim
+  tag real
+}

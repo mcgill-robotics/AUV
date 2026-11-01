@@ -1,0 +1,65 @@
+// Links between systems, and the training loop.
+model {
+  // sim <-> ROS
+  auv.tcp -> sim.physics.thrusters 'propulsion/forces'
+  sim.simsensors.sdvl -> auv.tcp 'dvl/*'
+  sim.simsensors.simu -> auv.tcp 'imu/data'
+  sim.simsensors.sdepth -> auv.tcp '/sensors/depth/z'
+  sim.simsensors.gt -> auv.tcp '/auv/ground_truth/*'
+  sim.camera.camPub -> auv.tcp '/down_cam/image_raw'
+  auv.tcp -> auv.sensors.imuProc 'imu/data'
+  auv.tcp -> auv.sensors.dvlProc 'dvl/*'
+  auv.tcp -> auv.sensors.depthProc '/sensors/depth/z'
+  auv.tcp -> auv.planner.board 'ground truth (optional)'
+  auv.tcp -> auv.vision.down 'down camera image (sim)'
+  auv.tcp -> sim.reset '/simulation/reset (Bool)'
+  sim.camera.depthCam -> auv.tcp 'depth image'
+
+  // bringup
+  auv.bringup -> auv.sensors 'includes launch'
+  auv.bringup -> auv.controls 'includes launch'
+  auv.bringup -> auv.propulsion 'includes launch'
+  auv.bringup -> auv.vision 'includes launch'
+  auv.bringup -> auv.telemetry 'includes launch'
+  auv.bringup -> auv.planner 'includes launch (off by default)'
+  auv.bringup -> auv.tcp 'sim:=true only'
+
+  // training loop
+  sim.converter -> training.datasets 'yolo_images, yolo_labels, data.yaml'
+  training.datasets -> training.organize 'raw_import'
+  training.organize -> training.augment 'train split'
+  training.augment -> training.train 'augmented train, plain val and test'
+  training.organize -> training.train 'val and test'
+  training.train -> training.export 'best.pth'
+  training.export -> auv.models 'weights.onnx, engine.plan'
+  training.prelabel -> roboflow 'prelabelled real images'
+  roboflow -> training.datasets 'corrected real labels'
+  auv.vision.front -> training.datasets 'collected real images (toggle_collection)'
+}
+
+// App-level summaries. These give the zoomed-out views one readable label
+// per arrow instead of "[...]". The detailed topics are on the component links.
+model {
+  auv.sensors -> auv.planner 'pose and velocity'
+  auv.sensors -> auv.controls 'pose and sensor frames'
+  auv.sensors -> auv.vision 'state/pose'
+  auv.vision -> auv.planner 'object map'
+  auv.planner -> auv.controls 'navigate goals'
+  auv.planner -> auv.vision 'set projection heights'
+}
+
+// App-level summaries for the simulator.
+model {
+  sim.simsensors -> auv.tcp 'sensor topics'
+  sim.camera -> auv.tcp 'down camera image'
+  auv.tcp -> sim.physics 'thruster forces'
+  sim.camera -> zed 'virtual ZED stream'
+}
+
+// App-level summaries, support view.
+model {
+  auv.drivers -> auv.sensors 'IMU, DVL, depth'
+  auv.tcp -> auv.sensors 'sensor topics (sim)'
+  auv.vision -> auv.telemetry 'object map, detections'
+  zed -> auv.vision 'image and depth'
+}

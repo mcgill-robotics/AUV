@@ -1,0 +1,124 @@
+// Level 1 and 2: who is in the picture, and the big boxes inside each system.
+// Components (level 3) live in their own files and use `extend`.
+
+model {
+  operator = actor 'Operator' {
+    summary 'Drives with an Xbox controller, watches in Foxglove.'
+  }
+
+  hw = external 'AUV Hardware' {
+    summary 'The physical devices. Each reaches the software through its own path.'
+  }
+  zed = external 'ZED SDK' {
+    summary 'Stereo depth, visual odometry, capture. The sim feeds it a fake camera.'
+  }
+  roboflow = external 'Roboflow' {
+    summary 'Where real images get their labels corrected by hand.'
+  }
+
+  // ------------------------------------------------------------------
+  auv = system 'AUV Software' {
+    summary 'The ROS 2 stack. Runs on the Jetson, or in the dev container next to the sim.'
+
+    bringup = app 'bringup' {
+      summary 'One launch file, no nodes. Includes every other package.'
+      description '
+        Starts sensors, propulsion, controls, vision, telemetry and (optionally) the planner.
+        sim:=true skips the hardware drivers and adds ros_tcp_endpoint.
+        planner defaults to off. dvl is forced on here, but off by default in sensors,
+        because the DVL can overheat out of the water.
+      '
+    }
+    drivers = app 'Hardware drivers' {
+      #real
+      summary 'Xsens IMU driver, DVL serial driver, micro-ROS agents.'
+      description 'Not started in sim. Serial devices get stable names from udev rules (/dev/display, /dev/actuator, /dev/power).'
+    }
+    tcp = app 'ros_tcp_endpoint' {
+      #sim
+      summary 'TCP bridge to Unity, port 10000.'
+    }
+    sensors = app 'sensors' {
+      summary 'Raw sensors in, one fused pose out.'
+    }
+    controls = app 'controls' {
+      summary 'A goal in, one total wrench out.'
+    }
+    propulsion = app 'propulsion' {
+      summary 'Wrench to eight thruster forces to PWM.'
+    }
+    teleop = app 'teleop' {
+      summary 'Gamepad or keyboard to wrench.'
+    }
+    planner = app 'planner' {
+      summary 'Behaviour tree that runs the competition tasks.'
+    }
+    vision = app 'vision' {
+      summary 'Camera images in, a persistent 3D map of the course out.'
+    }
+    telemetry = app 'telemetry' {
+      summary 'Foxglove bridge, scene markers, rosbag recording.'
+    }
+    models = store 'Model packages' {
+      summary 'vision/models/<name>/: weights.onnx, engine.plan, class_names.txt, configs.'
+    }
+    bags = store 'Rosbags' {
+      summary 'Recordings in ~/AUV/rosbags.'
+    }
+  }
+
+  // ------------------------------------------------------------------
+  sim = system 'Unity Simulator' {
+    summary 'Unity HDRP sim of the vehicle, pool and competition. Also makes synthetic training images.'
+
+    reset = app 'Sim core' {
+      summary 'ROS settings, clock, reset, camera render manager.'
+      description 'ROSSettings holds every topic name and frame id. SimulationResetManager listens on /simulation/reset (std_msgs/Bool).'
+    }
+    physics = app 'Vehicle physics' {
+      summary 'Buoyancy, drag, thrusters.'
+    }
+    simsensors = app 'Sensor simulation' {
+      summary 'DVL, IMU, depth, ground truth, with noise.'
+    }
+    camera = app 'Camera rendering' {
+      summary 'Renders the cameras and bends the image like a flat port.'
+    }
+    scoring = app 'Competition scoring' {
+      summary 'Task triggers, points, timer. Never touches ROS.'
+    }
+    synth = app 'Synthetic data generator' {
+      summary 'Randomizes scene, water and camera, labels every frame.'
+    }
+    converter = app 'YOLO Converter' {
+      summary 'Editor tool. SOLO output to YOLO images and labels.'
+    }
+    solo = store 'SOLO dataset' {
+      summary 'Raw Perception output.'
+    }
+  }
+
+  // ------------------------------------------------------------------
+  training = system 'Training Pipeline' {
+    summary 'Labelled images in, a TensorRT detector out. Lives in vision/model_pipeline.'
+
+    datasets = store 'Datasets' {
+      summary 'Raw imports and the train/val/test splits.'
+    }
+    organize = app 'organize_dataset' {
+      summary 'Splits 70/20/10. YOLO or COCO. Optional letterbox to 512.'
+    }
+    augment = app 'augment_dataset' {
+      summary 'Albumentations on the train split only. Synthetic data only.'
+    }
+    train = app 'training' {
+      summary 'YOLO or RF-DETR. Can fine-tune from a checkpoint.'
+    }
+    export = app 'export and engine build' {
+      summary 'ONNX export, then trtexec on the Jetson.'
+    }
+    prelabel = app 'Pre-labelling tools' {
+      summary 'Runs the synthetic model on real images so people only fix labels.'
+    }
+  }
+}

@@ -1,0 +1,34 @@
+// telemetry: for people. Nothing in here feeds back into control.
+model {
+  extend auv.telemetry {
+    bridge = component 'foxglove_bridge' {
+      summary 'WebSocket on port 8765 for Foxglove Studio.'
+      technology 'foxglove_bridge'
+    }
+    v2f = component 'vision_to_foxglove' {
+      summary 'Object map and detections as 3D scene markers.'
+      technology 'Python'
+    }
+    s2f = component 'setpoint_to_foxglove' {
+      summary 'The four setpoints as one pose marker.'
+      technology 'Python'
+    }
+    rosbagMgr = component 'rosbag_manager' {
+      summary 'Record and play, with named profiles.'
+      description 'Service /rosbag_manager/control. Profiles live in rosbag_profiles.yaml (all, vision, nav_and_controls, ...). Can auto-start with auto_start_rosbag.'
+      technology 'Python'
+    }
+    dry = component 'drytest_foxglove' {
+      summary 'Thruster bench-test services.'
+      technology 'Python'
+    }
+  }
+
+  auv.vision.map.publish -> auv.telemetry.v2f 'object_map'
+  auv.vision.front.emit -> auv.telemetry.v2f 'detections'
+  auv.controls.nav.publishSp -> auv.telemetry.s2f 'setpoints'
+  auv.telemetry.v2f -> auv.telemetry.bridge 'scene_objects'
+  auv.telemetry.s2f -> auv.telemetry.bridge 'pose_setpoint'
+  auv.telemetry.bridge -> operator 'WebSocket'
+  auv.telemetry.rosbagMgr -> auv.bags 'writes bags'
+}

@@ -1,0 +1,68 @@
+// The physical devices, and the software that talks to each one directly.
+// Rule: every sensor and actuator reaches ROS through exactly one path.
+//   IMU, DVL ........ their own driver (Xsens, DVL serial)
+//   depth, actuators, power ... a micro-ROS agent, talking to firmware on a board
+//   ZED camera ...... the ZED SDK, inside the vision node
+//   down camera ..... read by the vision node itself, never touches sensors
+// In the sim, ros_tcp_endpoint takes the place of the drivers and agents.
+
+model {
+  extend hw {
+    imuHw = device 'Xsens IMU' {
+      summary 'Orientation, angular rate, acceleration.'
+    }
+    dvlHw = device 'DVL (A50)' {
+      summary 'Velocity over the floor and a dead-reckoned position. Overheats out of the water.'
+    }
+    pressure = device 'Pressure sensor' {
+      summary 'Depth. Read by firmware on an embedded board, not by a ROS driver.'
+      description 'Firmware lives in the auv-embedded-2026 repository. It reaches ROS through micro_ros_agent.'
+    }
+    zedCam = device 'ZED 2i camera' {
+      summary 'Front stereo camera. Read through the ZED SDK.'
+    }
+    downCam = device 'Down camera' {
+      summary 'USB camera, /dev/down_cam. Read directly by the vision node.'
+    }
+    actuators = device 'Actuator board, ESCs and thrusters' {
+      summary 'Receives eight PWM values over micro-ROS. Also the grabber and torpedoes.'
+    }
+    power = device 'Power board' {
+      summary 'Battery monitor and kill signal.'
+    }
+  }
+
+  extend auv.drivers {
+    xsens = component 'Xsens driver' {
+      summary 'Publishes imu/data.'
+    }
+    dvlDrv = component 'DVL serial driver' {
+      summary 'Publishes dvl/velocity and dvl/dead_reckoning. Started only if dvl:=true.'
+      link https://github.com/mcgill-robotics/AUV/tree/main/ros2_ws/src/dvl_a50_serial_python 'dvl_a50_serial_python'
+    }
+    microros = component 'micro-ROS agents' {
+      summary 'Bridge between ROS topics and the firmware on the embedded boards.'
+      description '
+        Three agents, one per serial device: /dev/display and /dev/actuator are started by the sensors launch,
+        /dev/power by the propulsion launch. All at 115200 baud.
+        A comment in the code says the actuator agent does not belong in sensors.
+        Device names come from udev rules made by jetson_scripts/serial.
+      '
+    }
+  }
+
+  hw.imuHw -> auv.drivers.xsens 'raw IMU'
+  hw.dvlHw -> auv.drivers.dvlDrv 'raw DVL'
+  hw.pressure -> auv.drivers.microros 'pressure readings'
+  hw.power -> auv.drivers.microros 'battery and kill'
+  auv.drivers.microros -> hw.actuators 'PWM to the actuator board'
+
+  auv.drivers.xsens -> auv.sensors.imuProc 'imu/data'
+  auv.drivers.dvlDrv -> auv.sensors.dvlProc 'dvl/velocity, dvl/dead_reckoning'
+  auv.drivers.dvlDrv -> auv.sensors.imuProc 'dvl/dead_reckoning (yaw fix)'
+  auv.drivers.microros -> auv.sensors.depthProc '/sensors/depth/z'
+  auv.drivers.microros -> auv.propulsion.killer '/power/kill'
+
+  hw.zedCam -> zed 'camera stream'
+  hw.downCam -> auv.vision.down 'frames (V4L2)'
+}

@@ -1,0 +1,23 @@
+views {
+  view simOverview of sim {
+    title '11. Unity simulator'
+    autoLayout LeftRight
+    include sim.*
+    include auv.tcp, zed, training.datasets
+  }
+
+  view simInside {
+    title '12. Inside the simulator: what it fakes'
+    description 'Physics, sensors and cameras. The same topics as the real vehicle.'
+    autoLayout LeftRight
+    include sim.physics.*, sim.simsensors.*, sim.camera.*
+    include auv.tcp, zed
+  }
+
+  view synthTraining {
+    title '13. Synthetic data and training: images to a model'
+    autoLayout LeftRight
+    include sim.synth.*, sim.solo, sim.converter
+    include training.*, roboflow, auv.models, auv.vision.front
+  }
+}
