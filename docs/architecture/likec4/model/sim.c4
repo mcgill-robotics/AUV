@@ -1,0 +1,127 @@
+// Unity simulator internals. Paths are under Assets/_Project/Scripts in auv-sim-unity.
+model {
+  extend sim.physics {
+    thrusters = component 'Thrusters' {
+      summary 'Eight forces in, eight forces applied to the rigidbody.'
+      description '
+        In: /propulsion/forces (ThrusterForces, newtons).
+        Each thruster: ramp at 100 N/s (motor inertia), 1 N deadband, +/-5% efficiency,
+        clamp to +50 N forward and -40 N reverse (T200-like), then AddForceAtPosition.
+        A thruster above the water gives nothing. WASD and IJKL keys add to the ROS command.
+      '
+      technology 'Actuators/Thrusters.cs'
+    }
+    buoyancy = component 'Buoyancy' {
+      summary 'Archimedes force at an offset centre, so the vehicle rights itself.'
+      description 'Force scales with how much of the hull is submerged. Uses a bounding-box approximation.'
+      technology 'Physics/Buoyancy.cs'
+    }
+    drag = component 'Drag' {
+      summary 'Fossen-style drag, added mass and cross-coupling.'
+      description '
+        Unity damping is turned off. Quadratic plus linear drag, angular drag,
+        added mass from filtered acceleration, surge/pitch and sway/yaw coupling.
+        Coefficients come from a lookup (Data/drag_lookup.json) or a system-identification fit,
+        so the sim can match the real vehicle.
+      '
+      technology 'Physics/Drag.cs'
+    }
+  }
+
+  extend sim.simsensors {
+    sdvl = component 'DVL' {
+      summary 'Four raycast beams with noise, bias and dropouts.'
+      description '
+        A50 model. Beams tilted 22.5 degrees, needs 3 of 4 valid. Gaussian noise (more horizontal than vertical),
+        Gauss-Markov bias, random outliers, grazing-angle rejection. Update rate 4 to 26 Hz depending on altitude.
+        Publishes dvl/velocity, dvl/dead_reckoning, dvl/odometry.
+      '
+      technology 'Sensors/DVLPublisher.cs'
+    }
+    simu = component 'IMU' {
+      summary 'MTi-600 style. White noise plus slowly drifting bias.'
+      description 'Publishes imu/data. Orientation covariance is -1 (raw) unless AHRS-style noise is turned on.'
+      technology 'Sensors/IMUPublisher.cs'
+    }
+    sdepth = component 'Depth sensor' {
+      summary 'Depth is -Y position plus noise and bias.'
+      technology 'Sensors/DepthPublisher.cs'
+    }
+    gt = component 'Ground truth' {
+      summary 'Perfect pose, twist and object detections. For testing the planner without vision.'
+      description 'Publishes /auv/ground_truth/*, and /vision/object_map directly through GroundTruthVisionPublisher.'
+      technology 'Sensors/GroundTruth*.cs'
+    }
+    delay = component 'Sensor delay buffer' {
+      summary 'Adds latency and the DVL ping interval, optionally random per reset.'
+      technology 'Sensors/SensorDelayBuffer.cs'
+    }
+  }
+
+  extend sim.camera {
+    camPub = component 'CameraPublisher' {
+      summary 'Reads the render back and publishes sensor_msgs/Image.'
+      description 'Used for the down camera. The front camera uses the ZED path when ZED streaming is on.'
+      technology 'Sensors/CameraPublisher.cs'
+    }
+    refraction = component 'Refraction shader' {
+      summary 'Bends the image the way a flat port does underwater.'
+      description '
+        Hidden/UnderwaterRefraction. Index 1.333, focal length, principal point and resolution
+        (default 504.6 px, 672x376) match the real ZED.
+        Training on undistorted images would hurt on the real camera. The vision code undoes the bend with Snell.
+      '
+      technology 'Shaders/UnderwaterRefraction.shader'
+    }
+    zedSender = component 'ZED2iSimSender' {
+      summary 'Streams two virtual ZED cameras through the real ZED SDK.'
+      description '
+        Native plugin, 672x376, port 30000. The vision node opens it as if it were a real ZED (sim: true picks GEN_1 tracking, VGA).
+        This is why depth and VIO code run the same in sim.
+        Needs ZED SDK 5.4.1 or newer and NVIDIA drivers older than 590.
+      '
+      technology 'ZedNativeAPI'
+    }
+    depthCam = component 'Depth camera' {
+      summary 'Metric depth from an HDRP custom pass. Published as 32FC1.'
+      technology 'Sensors/CameraDepthPublisher.cs'
+    }
+  }
+
+  extend sim.synth {
+    batch = component 'BatchRunner' {
+      summary 'Chains batches with different settings into one run.'
+      description '
+        Each batch sets: iteration count, whether objects spawn, visibility range, water scatter and colour,
+        exposure, contrast, saturation, grain, camera distance, pitch, roll, yaw jitter, front or down camera.
+        Clear versus murky water and near versus far come from different batches. Stops Play mode when done.
+      '
+      technology 'SynthDataGen/BatchRunner.cs'
+    }
+    randomizers = component 'Randomizers' {
+      summary 'Place objects, aim the camera, change the water, swap target textures.'
+      description '
+        PoolFloorPlacement (Poisson-disk, per-prefab height), TablePlacement, BoundedCamera (stays in the pool, looks at an object),
+        UnderwaterEnvironment (absorption, scatter, colour filter, exposure, grain), VisualTarget (swaps a gate or board texture together with its label, so they cannot disagree).
+      '
+    }
+    labelers = component 'Perception camera and labelers' {
+      summary '672x376. Boxes, occlusion, and instance masks for the down camera.'
+      description '
+        ConditionalLabeling only labels an object inside a max distance and valid viewing angle.
+        The converter drops anything under a visibility threshold using the occlusion labeler.
+        Game view must be fixed to 672x376 to match the ZED.
+      '
+    }
+  }
+
+  sim.synth.batch -> sim.synth.randomizers 'configures per batch'
+  sim.synth.randomizers -> sim.synth.labelers 'scene to capture'
+  sim.synth.labelers -> sim.solo 'SOLO JSON and PNG'
+  sim.solo -> sim.converter 'latest solo* folder'
+
+  sim.camera.refraction -> sim.camera.camPub 'bent image'
+  sim.camera.refraction -> sim.camera.zedSender 'bent image'
+  sim.camera.zedSender -> zed 'network stream, port 30000'
+  sim.simsensors.delay -> sim.simsensors.sdvl 'latency'
+}

@@ -1,0 +1,25 @@
+// Start here. Three views: the whole picture, the vehicle's loop, and how hardware connects.
+views {
+  view index {
+    title '1. The whole picture'
+    description 'Start here. Click a box to zoom into it.'
+    include operator, auv, sim, training, hw, zed, roboflow
+  }
+
+  view mainLoop of auv {
+    title '2. The AUV software: sense, decide, move'
+    description 'Everything that touches hardware goes through the drivers. Cameras are read by vision directly (view 3).'
+    autoLayout LeftRight
+    include auv.sensors, auv.vision, auv.planner, auv.controls, auv.propulsion, auv.teleop
+    include auv.drivers, operator
+  }
+
+  view hardware of hw {
+    title '3. Hardware: how each device reaches ROS'
+    description 'One path per device. In the sim, ros_tcp_endpoint replaces the drivers.'
+    autoLayout LeftRight
+    include hw.*
+    include auv.drivers.*
+    include zed, auv.sensors, auv.propulsion, auv.vision.front, auv.vision.down
+  }
+}

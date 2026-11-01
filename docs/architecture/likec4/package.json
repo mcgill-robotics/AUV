@@ -1,0 +1,13 @@
+{
+  "name": "auv-architecture",
+  "private": true,
+  "description": "Architecture diagrams for the AUV stack, written in LikeC4",
+  "scripts": {
+    "start": "likec4 start",
+    "validate": "likec4 validate",
+    "build": "likec4 build -o dist"
+  },
+  "devDependencies": {
+    "likec4": "^1.60.0"
+  }
+}

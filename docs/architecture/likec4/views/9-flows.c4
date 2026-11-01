@@ -1,0 +1,177 @@
+// Step-by-step flows. Follow one piece of data through the system.
+// Flow 1 is the overview. Flows 2 to 6 zoom into one stage of it.
+views {
+  dynamic view bringupFlow {
+    title 'Flow 0: what bringup starts'
+    description 'bringup has no nodes. It includes other launch files, all at once.'
+    autoLayout LeftRight
+
+    parallel {
+      auv.bringup -> auv.sensors 'always'
+      auv.bringup -> auv.propulsion 'always'
+      auv.bringup -> auv.controls 'always'
+      auv.bringup -> auv.vision 'always'
+      auv.bringup -> auv.telemetry 'always'
+      auv.bringup -> auv.planner 'off by default. Waits 30 s before the mission.'
+      auv.bringup -> auv.tcp 'only with sim:=true'
+    }
+  }
+
+  dynamic view missionFlow {
+    title 'Flow 1: going through the gate'
+    description 'The whole loop, one lap. Each stage has its own zoom flow.'
+    autoLayout TopBottom
+
+    auv.vision.map.publish -> auv.planner.board 'object_map has the gate and its panels'
+    auv.planner.board -> auv.planner.tasks.gate 'Gate task reads the map and the pose'
+    auv.planner.tasks.gate -> auv.planner.tasks.gate 'Pick the nearest gate and its role panel. Check the detection is fresh and has an orientation.'
+    auv.planner.tasks.gate -> auv.planner.tasks.gate 'Compute an approach point and a pass point along the gate direction'
+    auv.planner.tasks.gate -> auv.controls 'AUVNavigate goal (zoom: Flow 5)'
+    auv.controls -> auv.propulsion 'One wrench (zoom: Flow 6)'
+    auv.propulsion -> auv.drivers 'PWM values for eight thrusters'
+    auv.drivers -> hw.actuators 'Over micro-ROS to the actuator board. The vehicle moves.'
+    hw.imuHw -> auv.drivers 'IMU, DVL and depth change'
+    auv.drivers -> auv.sensors 'Raw readings'
+    auv.sensors -> auv.controls 'state/pose closes the loop (zoom: Flow 2)'
+    auv.controls -> auv.planner.tasks.gate 'Goal result: success or timeout'
+  }
+
+  dynamic view sensorsFlow {
+    title 'Flow 2: one yaw change travels through sensors'
+    description 'From three devices to the one pose everyone reads.'
+    autoLayout TopBottom
+
+    hw.imuHw -> auv.drivers.xsens 'The vehicle yawed 10 degrees'
+    auv.drivers.xsens -> auv.sensors.imuProc 'imu/data'
+    auv.sensors.imuProc -> auv.sensors.imuProc 'Rotate into the AUV frame. Pull yaw toward the DVL heading so it does not drift.'
+    parallel {
+      auv.sensors.imuProc -> auv.sensors.depthProc 'auv_frame/imu'
+      auv.sensors.imuProc -> auv.sensors.dvlProc 'auv_frame/imu'
+    }
+    hw.pressure -> auv.drivers.microros 'Pressure reading from the embedded board'
+    auv.drivers.microros -> auv.sensors.depthProc '/sensors/depth/z'
+    auv.sensors.depthProc -> auv.sensors.depthProc 'Correct for the sensor sitting off-centre when the vehicle tilts'
+    hw.dvlHw -> auv.drivers.dvlDrv 'Velocity and position'
+    auv.drivers.dvlDrv -> auv.sensors.dvlProc 'dvl/velocity, dvl/dead_reckoning'
+    auv.sensors.dvlProc -> auv.sensors.dvlProc 'Rotate into the AUV frame (mount rotation from sensors_frames.yaml)'
+    parallel {
+      auv.sensors.imuProc -> auv.sensors.stateAgg.imuIn 'orientation'
+      auv.sensors.depthProc -> auv.sensors.stateAgg.depthIn 'z'
+      auv.sensors.dvlProc -> auv.sensors.stateAgg.dvlIn 'x, y'
+    }
+    auv.sensors.stateAgg.poseOut -> auv.sensors.stateAgg.poseOut 'Combine. Publish state/pose at 50 Hz.'
+    auv.sensors.stateAgg.poseOut -> auv.controls.nav.execute 'state/pose. The planner and vision read it too.'
+  }
+
+  dynamic view perceptionFlow {
+    title 'Flow 3: a gate sighting becomes a map entry'
+    description 'One camera frame, from pixels to the planner.'
+    autoLayout TopBottom
+
+    hw.zedCam -> zed 'Camera stream'
+    zed -> auv.vision.front.grab 'ZED image 672x376 and depth map'
+    auv.vision.front.snapshot -> auv.vision.front.snapshot 'Snapshot one AUV pose for this frame'
+    auv.vision.front.grab -> auv.vision.front.infer 'Image'
+    auv.vision.front.infer -> auv.vision.front.locate 'RF-DETR boxes (0.60), border filter, gate cropped'
+    auv.vision.front.locate -> auv.vision.front.locate 'Pick a depth method per label. Undo the flat-port bending (Snell). Build a covariance.'
+    auv.vision.front.locate -> auv.vision.front.emit '3D positions and covariances'
+    auv.vision.front.emit -> auv.vision.map.onFront 'Detection frame, with the AUV pose attached'
+    auv.vision.map.onFront -> auv.vision.map.tracker 'Moved into pool_link (zoom: Flow 4)'
+    auv.vision.map.tracker -> auv.vision.map.publish 'Matched to a track, or a new one starts. Confirmed after 20 hits.'
+    auv.vision.map.publish -> auv.vision.map.persistent 'Unique objects like the gate are copied in'
+    auv.vision.map.publish -> auv.planner.board 'object_map. Unique objects stay in it.'
+  }
+
+  dynamic view trackerFlow {
+    title 'Flow 4: inside the tracker'
+    description 'What ObjectTracker.update does with one batch of detections.'
+    autoLayout TopBottom
+
+    auv.vision.map.onFront -> auv.vision.map.tracker.cost 'Detections in pool_link, with covariances'
+    auv.vision.map.tracker.cost -> auv.vision.map.tracker.match 'Euclidean cost matrix. Class mismatch and over-limit jumps are blocked.'
+    auv.vision.map.tracker.match -> auv.vision.map.tracker.kalman 'Matched pairs: Kalman update, one more hit'
+    auv.vision.map.tracker.match -> auv.vision.map.tracker.lifecycle 'Unmatched tracks: age them, demote or delete'
+    auv.vision.map.tracker.match -> auv.vision.map.tracker.spawn 'Unmatched detections: start new tracks if allowed'
+    auv.vision.map.tracker.kalman -> auv.vision.map.tracker.constraints 'Updated tracks: gate and board corrections'
+    auv.vision.map.tracker.spawn -> auv.vision.map.tracker.constraints 'New tracks join them'
+    auv.vision.map.tracker.constraints -> auv.vision.map.publish 'Tracks. Confirmed ones are published.'
+  }
+
+  dynamic view navFlow {
+    title 'Flow 5: one navigate goal inside controls'
+    description 'What navigation_server does between a goal and a result.'
+    autoLayout TopBottom
+
+    auv.planner.tasks -> auv.controls.nav.accept 'AUVNavigate: relative 2 m forward, do_x only, tolerance 0.2 m, hold 2 s, timeout'
+    auv.controls.nav.accept -> auv.controls.nav.execute 'Goal accepted'
+    auv.controls.nav.execute -> auv.controls.nav.target 'Turn the goal into absolute targets using the current pose'
+    auv.controls.nav.execute -> auv.controls.nav.publishSp 'Targets'
+    parallel {
+      auv.controls.nav.publishSp -> auv.controls.planar 'x_setpoint'
+      auv.controls.nav.publishSp -> auv.controls.depthCtl 'depth_setpoint'
+      auv.controls.nav.publishSp -> auv.controls.attitude 'quaternion_setpoint'
+    }
+    auv.sensors.stateAgg.poseOut -> auv.controls.nav.execute 'state/pose, every cycle'
+    auv.controls.nav.execute -> auv.controls.nav.errors 'Compare the pose with the target. Track time_in_tolerance against hold_time.'
+    auv.controls.nav.execute -> auv.planner.tasks 'Feedback at 10 Hz. Result: success after hold_time in tolerance, or failure on timeout.'
+  }
+
+  dynamic view thrustFlow {
+    title 'Flow 6: four efforts become eight PWM signals'
+    description 'superimposer, then thrust_mapper. Teleop joins at the end, skipping the controllers.'
+    autoLayout TopBottom
+
+    parallel {
+      auv.controls.planar -> auv.controls.superimposer.rx 'x/y effort (pool frame)'
+      auv.controls.depthCtl -> auv.controls.superimposer.rx 'depth effort (pool frame)'
+      auv.controls.attitude -> auv.controls.superimposer.rx 'attitude torque'
+    }
+    auv.sensors.imuProc -> auv.controls.superimposer.rx 'auv_frame/imu'
+    auv.controls.superimposer.rx -> auv.controls.superimposer.limit 'Latest efforts'
+    auv.controls.superimposer.limit -> auv.controls.superimposer.rotate 'Clamp planar and depth force'
+    auv.controls.superimposer.rotate -> auv.controls.superimposer.torque 'Rotate into the body frame with the inverse IMU quaternion'
+    auv.controls.superimposer.torque -> auv.controls.superimposer.pub 'Add attitude torque and bias'
+    auv.controls.superimposer.pub -> auv.propulsion.mapper.alloc '/controls/total_effort at 30 Hz'
+    auv.propulsion.mapper.alloc -> auv.propulsion.mapper.pwm 'Pseudo-inverse of the 8x6 matrix. Disabled thrusters zeroed.'
+    auv.propulsion.mapper.arm -> auv.propulsion.mapper.pwm 'ESCs armed once, 1 s after start'
+    auv.propulsion.mapper.pwm -> auv.drivers.microros 'propulsion/microseconds, limited to 1228 to 1768 us'
+    auv.drivers.microros -> hw.actuators 'To the actuator board, then the ESCs'
+    auv.propulsion.mapper.pwm -> auv.tcp 'propulsion/forces in newtons. Only the sim reads it.'
+  }
+
+  dynamic view simLoopFlow {
+    title 'Flow 7: one thruster command in the sim'
+    description 'The same topics as the real vehicle, with Unity standing in for the hardware.'
+    autoLayout TopBottom
+
+    auv.propulsion.mapper.pwm -> auv.tcp 'propulsion/forces, eight values in newtons'
+    auv.tcp -> sim.physics.thrusters 'TCP, port 10000'
+    sim.physics.thrusters -> sim.physics.buoyancy 'Forces applied to the rigidbody, with buoyancy and drag'
+    sim.physics.buoyancy -> sim.simsensors.sdvl 'Vehicle moves. Sensors sample the new state.'
+    sim.simsensors.sdvl -> auv.tcp 'dvl/velocity, with noise and delay'
+    auv.tcp -> auv.sensors.dvlProc 'Same topic as the real DVL driver'
+    auv.sensors.dvlProc -> auv.sensors.stateAgg.dvlIn 'auv_frame/dvl/*'
+  }
+
+  dynamic view dataFlow {
+    title 'Flow 8: a simulated image becomes a model on the vehicle'
+    description 'Synthetic images first. A small set of real images fine-tunes the result.'
+    autoLayout TopBottom
+
+    sim.synth.batch -> sim.synth.randomizers 'A batch sets water, camera and object ranges'
+    sim.synth.randomizers -> sim.synth.labelers 'Scene is built. Camera takes a frame.'
+    sim.synth.labelers -> sim.solo 'SOLO JSON and PNG'
+    sim.solo -> sim.converter 'Tools > RoboSub > YOLO Converter'
+    sim.converter -> training.datasets 'yolo_images, yolo_labels'
+    training.datasets -> training.organize 'Split 70/20/10'
+    training.organize -> training.augment 'Augment the train split'
+    training.augment -> training.train 'Train RF-DETR'
+    training.train -> training.export 'best.pth to ONNX, then trtexec on the Jetson'
+    training.export -> auv.models 'weights.onnx and engine.plan in vision/models'
+    auv.models -> auv.vision.front 'vision_pipeline.yaml picks the package by the sim flag'
+    auv.vision.front -> training.datasets 'Later: collect real images (toggle_collection)'
+    training.datasets -> training.prelabel 'Real images'
+    training.prelabel -> roboflow 'Synthetic model pre-labels them. People correct the labels.'
+    roboflow -> training.train 'Fine-tune with --custom-model. fix_labels.py restores class order.'
+  }
+}

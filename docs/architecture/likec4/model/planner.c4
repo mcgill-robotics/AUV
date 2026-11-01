@@ -1,0 +1,34 @@
+// planner: reads the world through the blackboard, acts by sending navigate goals.
+model {
+  extend auv.planner {
+    tree = component 'Behaviour tree' {
+      summary 'py_trees root tree. Ticks at 3 Hz after a 30 s start delay.'
+      description 'root_tree.py builds the mission from behaviour_tree_params.yaml. The start delay is what holds the mission back, since bringup starts everything at once.'
+      technology 'py_trees_ros'
+    }
+    tasks = component 'Mission tasks' {
+      summary 'Gate, slalom, bins, torpedo, table and octagon, return home.'
+      description '
+        Each task is a set of behaviours. Most of them wrap an AUVNavigate goal and read the object map.
+        Pre-qual and debug missions live next to them.
+        Gate: picks the nearest gate and the nearest role panel, then flies approach and pass points along the gate direction.
+        Search sweep: turns 360 degrees until the target label shows up.
+      '
+    }
+    board = component 'Blackboard feeds' {
+      summary 'Subscribes to pose, twist, object map and down-cam detections.'
+      description '
+        state/pose, auv_frame/dvl/velocity, /dvl/velocity, /vision/object_map, /vision/down_cam/detection_frame.
+        In sim with use_ground_truth, pose and twist come from /auv/ground_truth/* instead.
+        Behaviours only read from here, which keeps them easy to test.
+        Nothing checks message age. Staleness is judged by frames_since_last_seen on each object.
+      '
+    }
+  }
+
+  auv.planner.board -> auv.planner.tasks 'read by behaviours'
+  auv.planner.tree -> auv.planner.tasks 'ticks'
+  auv.sensors.stateAgg.poseOut -> auv.planner.board 'state/pose'
+  auv.sensors.dvlProc -> auv.planner.board 'auv_frame/dvl/velocity'
+  auv.planner.tree -> auv.telemetry.rosbagMgr 'start and stop recording'
+}

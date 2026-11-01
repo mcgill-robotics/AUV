@@ -1,0 +1,287 @@
+// Level 4: the nodes worth opening up. Each child is named after a real
+// function or class, so the code can be found from the diagram.
+// Source links point at the main branch on GitHub.
+
+model {
+  // ---------------------------------------------------------------- object_map
+  extend auv.vision.map {
+    link https://github.com/mcgill-robotics/AUV/blob/main/ros2_ws/src/vision/vision/object_map/object_map.cpp 'object_map.cpp'
+
+    onFront = component 'detection_callback (front)' {
+      summary 'Front detections into pool_link, then to the front tracker.'
+      description '
+        Pose snapshot x TF(auv_link to camera) puts each detection in pool_link.
+        Drops pipes beyond 7 m and anything outside the lane boundary.
+        Builds the world covariance from the camera covariance and the distance.
+        Skips the frame if the TF is missing.
+      '
+    }
+    onDown = component 'down_cam_detection_callback' {
+      summary 'Down-camera detections into pool_link, then to the same tracker class.'
+      description 'Same transform. Fixed covariance of 0.2 I. Its own instance of the tracker, with its own limits.'
+    }
+    tracker = component 'ObjectTracker' {
+      summary 'Kalman filter per object, matched by Hungarian assignment. One instance per camera.'
+      description '
+        Front instance: confirms after 20 hits, jump limit 1.5 m.
+        Down instance: confirms after 10 hits, jump limit 2.0 m.
+        Same code, different parameters. The model below is the code path.
+      '
+      link https://github.com/mcgill-robotics/AUV/blob/main/ros2_ws/src/vision/vision/object_map/object_tracker.cpp 'object_tracker.cpp'
+    }
+    persistent = store 'Persistent objects' {
+      summary 'Gate, table, octagon, board, bin_structure. Kept until ~/clear.'
+    }
+    publish = component 'publish_object_map' {
+      summary 'Merges both trackers and the persistent objects into one message.'
+      description '
+        Unique objects come from the persistent store, so they are published forever.
+        Pipes, bins and lane markers are published only while their track is confirmed.
+        table_octagon_mode table_primary puts the octagon at the table x and y, at the surface, with id = table id + 1000.
+        z_axis_locking snaps floor and surface labels. Its lists hold only "placeholder" today.
+        Sets frames_since_last_seen from the track age. The planner uses that for staleness.
+      '
+    }
+    clear = component '~/clear service' {
+      summary 'Empties the tracks and the persistent objects.'
+    }
+  }
+
+  extend auv.vision.map.tracker {
+    cost = component 'compute_cost_matrix' {
+      summary 'Euclidean distance. Class mismatch costs 1e6. Over the jump limit is blocked.'
+      description 'The Mahalanobis version is commented out. Bad covariances caused blow-ups and duplicate tracks.'
+    }
+    match = component 'match_tracks' {
+      summary 'Hungarian assignment of detections to tracks.'
+    }
+    kalman = component 'update_matched_tracks' {
+      summary 'Kalman update with a per-detection covariance. Static model.'
+      description 'Three states, A = I, tiny process noise. Each match adds a hit. A track is CONFIRMED after min_hits.'
+    }
+    lifecycle = component 'handle_unmatched_tracks, delete_dead_tracks' {
+      summary 'Misses age a track. Confirmed drops to tentative after 5 misses. Tentative tracks that miss too often are deleted.'
+      description 'Pipes, lane markers and bins get 450 frames instead of 5.'
+    }
+    spawn = component 'create_new_tracks' {
+      summary 'Unmatched detections start new tracks, within max_per_class and separation rules.'
+    }
+    constraints = component 'apply_physical_constraints' {
+      summary 'Gate and board corrections.'
+      description '
+        Gate: the confirmed search_rescue and survey_repair panels pull the gate to their midpoint
+        and set which way it faces. A gate is made up if only the panels were seen.
+        Board: icon pairs refine its position. Both only act within 3 m of the current estimate.
+      '
+    }
+  }
+
+  auv.vision.map.onFront -> auv.vision.map.tracker.cost 'detections in pool_link'
+  auv.vision.map.onDown -> auv.vision.map.tracker.cost 'detections in pool_link'
+  auv.vision.map.tracker.cost -> auv.vision.map.tracker.match 'cost matrix'
+  auv.vision.map.tracker.match -> auv.vision.map.tracker.kalman 'matched pairs'
+  auv.vision.map.tracker.match -> auv.vision.map.tracker.lifecycle 'unmatched tracks'
+  auv.vision.map.tracker.match -> auv.vision.map.tracker.spawn 'unmatched detections'
+  auv.vision.map.tracker.kalman -> auv.vision.map.tracker.constraints 'updated tracks'
+  auv.vision.map.tracker.spawn -> auv.vision.map.tracker.constraints 'new tracks'
+  auv.vision.map.tracker -> auv.vision.map.publish 'confirmed tracks'
+  auv.vision.map.publish -> auv.vision.map.persistent 'copy unique objects'
+  auv.vision.map.persistent -> auv.vision.map.publish 'republish forever'
+  auv.vision.map.clear -> auv.vision.map.persistent 'empties'
+  auv.vision.map.clear -> auv.vision.map.tracker 'empties'
+  auv.vision.front.emit -> auv.vision.map.onFront 'front_cam/detection_frame'
+  auv.vision.down -> auv.vision.map.onDown 'down_cam/detection_frame'
+  auv.vision.map.publish -> auv.planner.board 'vision/object_map'
+
+  // ---------------------------------------------------------------- front detector
+  extend auv.vision.front {
+    link https://github.com/mcgill-robotics/AUV/blob/main/ros2_ws/src/vision/vision/object_detection/front_cam_object_detection_node.py 'front_cam_object_detection_node.py'
+
+    grab = component '_grab_loop' {
+      summary 'Capture thread. ZED grab, retrieve the left image and the depth map.'
+    }
+    snapshot = component 'pose snapshot' {
+      summary 'One AUV pose per frame, from state/pose or ZED VIO.'
+      description '_get_auv_world_pose_snapshot. It rides in the output message so the map never has to guess the pose at capture time.'
+    }
+    infer = component 'RF-DETR inference and filters' {
+      summary 'Threshold 0.60, border filter, gate cropped to its top half.'
+      description 'Part of _process_frame. Pipes, gate and bin boxes touching the image edge are cut off, so they are dropped.'
+    }
+    locate = component '_compute_3d_position' {
+      summary 'Pick a depth method per label, then undo the flat-port bending.'
+      description '
+        Methods, set per label in vision_pipeline.yaml:
+        depth_map_median, depth_map_nearest (10th percentile), zed_3d (bin), known_height, ray to surface or floor (octagon).
+        Then Snell: apply_snells_law_depth and apply_snells_law_lateral in object_detection/utils.py.
+        Then a covariance from the depth ROI (or ZED covariance) plus a distance term.
+      '
+    }
+    emit = component 'VisionDetectionFrame publisher' {
+      summary 'Detections with pose_camera and covariance, plus the pose snapshot.'
+    }
+  }
+  auv.vision.front.grab -> auv.vision.front.infer 'image'
+  auv.vision.front.grab -> auv.vision.front.locate 'depth map'
+  auv.vision.front.snapshot -> auv.vision.front.locate 'camera pose in pool_link'
+  auv.vision.front.infer -> auv.vision.front.locate 'boxes and labels'
+  auv.vision.front.locate -> auv.vision.front.emit '3D positions and covariances'
+  auv.vision.front.snapshot -> auv.vision.front.emit 'pose'
+  auv.sensors.stateAgg.poseOut -> auv.vision.front.snapshot 'state/pose (pose_source auv_pose)'
+  zed -> auv.vision.front.grab 'image and depth'
+
+  // ---------------------------------------------------------------- state_aggregator
+  extend auv.sensors.stateAgg {
+    link https://github.com/mcgill-robotics/AUV/blob/main/ros2_ws/src/sensors/src/State_aggregator.cpp 'State_aggregator.cpp'
+
+    imuIn = component 'imu_callback' {
+      summary 'Orientation from auv_frame/imu.'
+    }
+    depthIn = component 'depth_callback' {
+      summary 'z from auv_frame/depth.'
+    }
+    dvlIn = component 'dvl_position and dvl_velocity callbacks' {
+      summary 'x and y from auv_frame/dvl/position, velocity from auv_frame/dvl/velocity.'
+    }
+    vioIn = component 'vio_pose_callback' {
+      summary 'Optional position and orientation from VIO. Off by default.'
+      description 'Subscribes to front_cam/vio/pose. The vision node publishes /vision/vio_pose. No remap found, so nothing reaches it today. use_vio_for_position and use_vio_for_orientation are false.'
+    }
+    poseOut = component 'pose assembly and publish' {
+      summary 'state/pose at 50 Hz, optional TF from pool_link to auv_link.'
+    }
+  }
+  auv.sensors.imuProc -> auv.sensors.stateAgg.imuIn 'auv_frame/imu'
+  auv.sensors.depthProc -> auv.sensors.stateAgg.depthIn 'auv_frame/depth'
+  auv.sensors.dvlProc -> auv.sensors.stateAgg.dvlIn 'auv_frame/dvl/*'
+  auv.sensors.stateAgg.imuIn -> auv.sensors.stateAgg.poseOut 'orientation'
+  auv.sensors.stateAgg.depthIn -> auv.sensors.stateAgg.poseOut 'z'
+  auv.sensors.stateAgg.dvlIn -> auv.sensors.stateAgg.poseOut 'x, y'
+  auv.sensors.stateAgg.vioIn -> auv.sensors.stateAgg.poseOut 'optional override'
+
+  // ---------------------------------------------------------------- navigation_server
+  extend auv.controls.nav {
+    link https://github.com/mcgill-robotics/AUV/blob/main/ros2_ws/src/controls/scripts/navigation_server.py 'navigation_server.py'
+
+    accept = component '_goal_callback, _cancel_callback' {
+      summary 'Accepts or rejects a goal. Handles cancel.'
+    }
+    execute = component '_execute_callback' {
+      summary 'The loop. Runs while the goal is active.'
+      description 'Computes the target, publishes setpoints, checks error each cycle, tracks time in tolerance, sends feedback at 10 Hz, ends on success or timeout.'
+    }
+    target = component '_compute_absolute_target' {
+      summary 'Turns a relative or body-frame goal into absolute x, y, depth and quaternion.'
+    }
+    errors = component '_compute_position_error, _compute_angular_error' {
+      summary 'How far the current pose is from the target, per enabled axis.'
+    }
+    publishSp = component '_publish_setpoints' {
+      summary 'Publishes the four setpoints. Only the axes the goal enables.'
+    }
+  }
+  auv.controls.nav.accept -> auv.controls.nav.execute 'goal accepted'
+  auv.controls.nav.execute -> auv.controls.nav.target 'goal and current pose'
+  auv.controls.nav.execute -> auv.controls.nav.publishSp 'target'
+  auv.controls.nav.execute -> auv.controls.nav.errors 'current pose, target'
+  auv.sensors.stateAgg.poseOut -> auv.controls.nav.execute 'state/pose'
+  auv.controls.nav.execute -> auv.planner.tasks 'feedback, result'
+  auv.planner.tasks.search -> auv.controls.nav.accept 'AUVNavigate goal (turn steps)'
+
+  // ---------------------------------------------------------------- superimposer
+  extend auv.controls.superimposer {
+    link https://github.com/mcgill-robotics/AUV/blob/main/ros2_ws/src/controls/src/superimposer.cpp 'superimposer.cpp'
+
+    rx = component 'effort and IMU callbacks' {
+      summary 'Keeps the latest depth, x, y and attitude efforts and the IMU orientation.'
+    }
+    limit = component 'limits' {
+      summary 'Clamps planar magnitude and depth effort, if limits are set.'
+    }
+    rotate = component 'rotate to body frame' {
+      summary 'force_body = inverse(IMU quaternion) x force_pool.'
+      description 'The depth and planar efforts are in the pool frame. The thrusters work in the body frame.'
+    }
+    torque = component 'add torque and bias' {
+      summary 'Attitude torque plus configured bias, clamped per axis.'
+    }
+    pub = component 'publish_combined_effort' {
+      summary 'Timer at 30 Hz. Publishes /controls/total_effort.'
+    }
+  }
+  auv.controls.superimposer.rx -> auv.controls.superimposer.limit 'pool-frame efforts'
+  auv.controls.superimposer.limit -> auv.controls.superimposer.rotate 'limited force'
+  auv.controls.superimposer.rotate -> auv.controls.superimposer.torque 'body-frame force'
+  auv.controls.superimposer.torque -> auv.controls.superimposer.pub 'wrench'
+  auv.sensors.imuProc -> auv.controls.superimposer.rx 'auv_frame/imu'
+  auv.controls.attitude -> auv.controls.superimposer.rx 'attitude_effort'
+  auv.controls.depthCtl -> auv.controls.superimposer.rx 'depth_effort'
+  auv.controls.planar -> auv.controls.superimposer.rx 'x/y_effort'
+  auv.controls.superimposer.pub -> auv.propulsion.mapper.alloc 'total_effort'
+  auv.teleop.converter -> auv.propulsion.mapper.alloc 'total_effort (skips the controllers)'
+
+  // ---------------------------------------------------------------- thrust_mapper
+  extend auv.propulsion.mapper {
+    link https://github.com/mcgill-robotics/AUV/blob/main/ros2_ws/src/propulsion/propulsion/thrust_mapper.py 'thrust_mapper.py'
+
+    arm = component '_do_arming_once, re_arm' {
+      summary 'Arms the ESCs once, 1 s after start. re_arm repeats it.'
+    }
+    alloc = component 'wrench_to_thrust' {
+      summary 'Wrench to eight forces: pseudo-inverse of the 8x6 allocation matrix.'
+      description 'Built from thruster geometry (a to e, alpha, dx, dy). Disabled thrusters have their column zeroed. Thruster 4 is disabled at launch.'
+    }
+    pwm = component 'forces_to_pwm_publisher' {
+      summary 'Forces to pulse widths, limited to 1228 to 1768 us. Publishes microseconds and forces.'
+    }
+  }
+  auv.propulsion.mapper.arm -> auv.propulsion.mapper.pwm 'ESCs armed'
+  auv.propulsion.mapper.alloc -> auv.propulsion.mapper.pwm 'eight forces'
+  auv.propulsion.mapper.pwm -> auv.drivers.microros 'propulsion/microseconds'
+  auv.propulsion.mapper.pwm -> auv.tcp 'propulsion/forces'
+
+  // ---------------------------------------------------------------- mission tasks
+  extend auv.planner.tasks {
+    link https://github.com/mcgill-robotics/AUV/tree/main/ros2_ws/src/planner/planner/missions 'missions/'
+
+    search = component 'Search sweep' {
+      summary 'Turns 360 degrees in steps until the target label appears.'
+      link https://github.com/mcgill-robotics/AUV/blob/main/ros2_ws/src/planner/planner/missions/vision_behaviours.py 'vision_behaviours.py'
+    }
+    gate = component 'Gate task' {
+      summary 'Nearest gate and its role panel, then approach and pass points.'
+      link https://github.com/mcgill-robotics/AUV/blob/main/ros2_ws/src/planner/planner/missions/robosub2026/gate_task.py 'gate_task.py'
+    }
+    slalom = component 'Slalom task' {
+      summary 'Pipes in front of the vehicle, found by a dot product with its heading.'
+      link https://github.com/mcgill-robotics/AUV/blob/main/ros2_ws/src/planner/planner/missions/robosub2026/slalom_task.py 'slalom_task.py'
+    }
+    bins = component 'Bins task' {
+      summary 'Bins task. Publishes to /actuators/grabber.'
+      link https://github.com/mcgill-robotics/AUV/blob/main/ros2_ws/src/planner/planner/missions/robosub2026/bins_task.py 'bins_task.py'
+    }
+    torpedo = component 'Torpedo task' {
+      summary 'Torpedo task. Fires through /actuators/torpedo.'
+      link https://github.com/mcgill-robotics/AUV/blob/main/ros2_ws/src/planner/planner/missions/robosub2026/torpedo_task.py 'torpedo_task.py'
+    }
+    table = component 'Table and octagon task' {
+      summary 'Finds the table, measures its height with the DVL, tells the down camera.'
+      link https://github.com/mcgill-robotics/AUV/blob/main/ros2_ws/src/planner/planner/missions/robosub2026/table_octagon_task.py 'table_octagon_task.py'
+    }
+    home = component 'Return home task' {
+      summary 'Return home task.'
+      link https://github.com/mcgill-robotics/AUV/blob/main/ros2_ws/src/planner/planner/missions/robosub2026/return_home_task.py 'return_home_task.py'
+    }
+  }
+  auv.planner.board -> auv.planner.tasks.search 'object_map'
+  auv.planner.board -> auv.planner.tasks.gate 'object_map, pose'
+  auv.planner.board -> auv.planner.tasks.slalom 'object_map, pose'
+  auv.planner.board -> auv.planner.tasks.table 'down-cam detections, DVL'
+  auv.planner.tasks.gate -> auv.controls.nav.accept 'AUVNavigate goal'
+  auv.planner.tasks.slalom -> auv.controls.nav.accept 'AUVNavigate goal'
+  auv.planner.tasks.table -> auv.controls.nav.accept 'AUVNavigate goal'
+  auv.planner.tasks.home -> auv.controls.nav.accept 'AUVNavigate goal'
+  auv.planner.tasks.table -> auv.vision.down 'set_projection_heights'
+  auv.planner.tasks.bins -> auv.drivers.microros '/actuators/grabber'
+  auv.planner.tasks.torpedo -> auv.drivers.microros '/actuators/torpedo'
+}

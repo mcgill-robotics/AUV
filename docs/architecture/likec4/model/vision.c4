@@ -1,0 +1,58 @@
+// vision: image -> detection with a 3D position -> tracked map in pool_link.
+model {
+  extend auv.vision {
+    front = component 'front_cam_object_detection' {
+      summary 'Finds objects in the ZED image and gives each a 3D position.'
+      description '
+        Per frame, in order:
+        1. Snapshot one AUV pose, so image and pose cannot drift apart.
+        2. RF-DETR inference, threshold 0.60.
+        3. Border filter on pipes, gate and bin. Gate box cropped to its top half.
+        4. Pick a depth method per label (see below).
+        5. Undo the flat-port bending (Snell). Depth scale 1.4, lateral scale 1.333.
+        6. Build a covariance. Publish the frame with the pose attached.
+
+        Depth methods, set per label in vision_pipeline.yaml:
+        depth_map_median, depth_map_nearest (10th percentile), zed_3d (bin),
+        known_height (pinhole), ray to the surface or floor (octagon).
+        Stereo depth is noisy on thin or featureless things like pipes and the gate,
+        so those use nearest-percentile or geometry instead.
+      '
+      technology 'Python, RF-DETR, TensorRT'
+    }
+    down = component 'down_cam_object_detection' {
+      summary 'Finds objects on the floor and projects the pixel onto a plane.'
+      description '
+        No depth sensor. Take the pixel (mask centroid), turn it into a ray with Snell,
+        and intersect it with a plane at a known height (0.67 for table items, 0.0 for lane markers).
+        The planner can change the heights at runtime, once the DVL has measured the table.
+        Yaw comes from minAreaRect on the largest contour.
+      '
+      technology 'Python, RF-DETR segmentation'
+    }
+    enhance = component 'image_enhancement' {
+      summary 'Optional clean-up before detection. Does nothing by default.'
+      description 'Both entry points use an Identity enhancer. Dehazing, CLAHE and colour correction are written but not switched on. With the ZED SDK the front camera ignores this topic.'
+      technology 'Python'
+    }
+    map = component 'object_map' {
+      summary 'Moves detections into pool_link, runs the trackers, publishes the map.'
+      description '
+        Pose snapshot x camera transform puts each detection in pool_link.
+        Pipes beyond 7 m are dropped, and detections outside the lane boundary.
+        Unique objects (gate, table, octagon, board, bin_structure) are kept forever once seen.
+        Pipes, bins and lane markers appear only while their track is confirmed.
+        Gate: the two role panels pull the gate to their midpoint and set its facing direction.
+        Service ~/clear empties the map.
+      '
+      technology 'C++'
+    }
+  }
+
+  auv.models -> auv.vision.front 'ONNX or engine'
+  auv.models -> auv.vision.down 'ONNX or engine'
+  auv.vision.enhance -> auv.vision.front 'image_enhanced (optional)'
+  auv.vision.enhance -> auv.vision.down 'image_enhanced (optional)'
+  auv.vision.down -> auv.planner.board 'down_cam/detection_frame'
+  auv.planner.tasks -> auv.vision.down 'set_projection_heights'
+}

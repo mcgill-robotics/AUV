@@ -1,0 +1,87 @@
+// controls and propulsion: goal -> setpoints -> efforts -> one wrench -> thrusters.
+model {
+  extend auv.controls {
+    nav = component 'navigation_server' {
+      summary 'Action server. Turns one goal into four setpoints and waits until you arrive.'
+      description '
+        Action: /motion/navigate (AUVNavigate).
+        In: state/pose. Out: /controls/{depth,x,y}_setpoint (Float64), /controls/quaternion_setpoint.
+        A goal can be relative or in the body frame, and each axis can be switched on or off (do_x, do_yaw, ...).
+        It reports done after the error stays inside tolerance for hold_time, or fails on timeout.
+      '
+      technology 'Python'
+    }
+    attitude = component 'attitude_controller' {
+      summary 'PID on quaternion error. Outputs a torque.'
+      description 'In: auv_frame/imu, quaternion_setpoint. Out: /controls/attitude_effort (Wrench). Adds a buoyancy moment term. 25 Hz.'
+      technology 'C++'
+    }
+    depthCtl = component 'depth_controller' {
+      summary 'Depth PID with a buoyancy feed-forward.'
+      description 'In: auv_frame/depth, depth_setpoint. Out: /controls/depth_effort (Wrench). 10 Hz.'
+      technology 'Python'
+    }
+    planar = component 'planar controllers (x, y)' {
+      summary 'Two copies of one node. Position and velocity from the DVL.'
+      description 'In: auv_frame/dvl/position, auv_frame/dvl/velocity, x or y setpoint. Out: /controls/{x,y}_effort (Wrench), in the pool frame.'
+      technology 'Python'
+    }
+    superimposer = component 'superimposer' {
+      summary 'Adds all efforts into one wrench and rotates it into the body frame.'
+      description '
+        In: the four efforts, auv_frame/imu.
+        Out: /controls/total_effort (Wrench), 30 Hz.
+        Depth and planar efforts are in the pool frame. It rotates them with the inverse IMU quaternion,
+        clamps them, then adds the attitude torque.
+        It is the only place that makes the final wrench, which is why teleop can plug in here too.
+      '
+      technology 'C++'
+    }
+  }
+
+  extend auv.propulsion {
+    mapper = component 'thrust_mapper' {
+      summary 'Wrench to eight thruster forces to PWM.'
+      description '
+        In: /controls/total_effort. Out: propulsion/microseconds (Int16MultiArray), propulsion/forces (ThrusterForces).
+        An 8x6 allocation matrix built from the thruster geometry, inverted with a pseudo-inverse.
+        A disabled thruster just gets its column zeroed. Thruster 4 is disabled at launch.
+        PWM is limited to 1228 to 1768 us, and it arms the ESCs once, 1 s after start.
+      '
+      technology 'Python'
+    }
+    killer = component 'jetson_assassin' {
+      summary 'Shuts the Jetson down when the power board says the battery is low.'
+      description 'In: /power/kill (Bool). Host shutdown is off by default (enable_host_shutdown).'
+      technology 'Python'
+    }
+  }
+
+  extend auv.teleop {
+    joy = component 'joy / keyboard input' {
+      summary 'Gamepad, or keyboard_to_joy. Publishes /joy at 20 Hz.'
+    }
+    converter = component 'teleop_converter' {
+      summary 'Joystick to wrench. Holds position when you let go.'
+      description '
+        LB is the deadman for controls mode, RB for propulsion mode.
+        Publishes /controls/total_effort directly, and the four setpoints so the vehicle holds.
+        Switches controllers on and off through their enabled parameter.
+      '
+      technology 'Python'
+    }
+  }
+
+  auv.sensors.imuProc -> auv.controls.attitude 'auv_frame/imu'
+  auv.sensors.depthProc -> auv.controls.depthCtl 'auv_frame/depth'
+  auv.sensors.dvlProc -> auv.controls.planar 'auv_frame/dvl/*'
+
+  auv.controls.nav.publishSp -> auv.controls.attitude 'quaternion_setpoint'
+  auv.controls.nav.publishSp -> auv.controls.depthCtl 'depth_setpoint'
+  auv.controls.nav.publishSp -> auv.controls.planar 'x/y_setpoint'
+
+
+
+  auv.teleop.joy -> auv.teleop.converter '/joy'
+  operator -> auv.teleop.joy 'Xbox controller'
+}
