@@ -69,22 +69,32 @@ namespace sensors
         rclcpp::Publisher<geometry_msgs::msg::TwistStamped>::SharedPtr velocity_pub_;
         rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odometry_pub_;
 
+        // Pose covariances are expressed in pool axes.
         Eigen::Matrix3d orientation_covariance_;
+        Eigen::Matrix3d position_covariance_;
+
+        // Twist covariances are expressed in vehicle axes.
         Eigen::Matrix3d angular_velocity_covariance_;
         Eigen::Matrix3d velocity_covariance_;
-        Eigen::Matrix3d position_covariance_;
+        Eigen::Matrix3d velocity_angular_covariance_;
 
         Vec3 current_position_p_;
         Vec3 current_velocity_p_;
         bool position_received_{false};
         bool velocity_received_{false};
 
-        Vec3 r_dv_v_; 
+        //Dislacement from vehicle frame to DVL frame, expressed in vehicle frame
+        Vec3 r_dv_v_;
         std::string frame_id_global_;
         std::string frame_id_auv_;
-        Quatd q_iv_; 
+        //Quaternion vehicle frame to pool frame
+        Quatd q_iv_;
+        //Angular velocity in vehicle frame
         Vec3 w_v_;
+        //Quaternion dvl inertial frame to pool inertial frame
         Quatd q_pi2_;
+        //Quaternion dvl frame to vehicle frame
+        //Basically dvl mountpoint to vehicle origin
         Quatd q_vd_;
     };
 

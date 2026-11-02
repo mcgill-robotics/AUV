@@ -23,12 +23,18 @@ struct ImuDataRawFrame {
     Vec3 f_s;    // Specific Force in the IMU's frame
     Vec3 w_s;    // Angular velocity in the IMU's frame
     quatd q_is;  // Sensor's orientation in the world frame
+	Eigen::Matrix3d orientation_covariance; // Orientation covariance in the IMU's frame
+	Eigen::Matrix3d angular_velocity_covariance; // Angular velocity covariance in the IMU's frame
+	Eigen::Matrix3d linear_acceleration_covariance; // Linear acceleration covariance in the IMU's frame
 };
 
 struct ImuDataAUVFrame {
     Vec3 a_free_v; // Free acceleration in AUV frame
     Vec3 w_v;    // Angular velocity in AUV frame
     quatd q_iv;  // Vehicle orientation relative to the world frame
+	Eigen::Matrix3d orientation_covariance; // Orientation covariance in the AUV's frame
+	Eigen::Matrix3d angular_velocity_covariance; // Angular velocity covariance in the AUV's frame
+	Eigen::Matrix3d linear_acceleration_covariance; // Linear acceleration covariance in the AUV's frame
 };
 
 class ImuProcessor: public rclcpp::Node
@@ -51,6 +57,7 @@ class ImuProcessor: public rclcpp::Node
 
 		Vec3 compute_free_acc(const Vec3& specific_force, const quatd& q_si) const;
 		Vec3 rotate_gyro(const Vec3& w_s) const;
+		Eigen::Matrix3d rotate_covariance(const Eigen::Matrix3d& covariance_s) const;
 
 		quatd q_sv_;
 		quatd q_vs_; 

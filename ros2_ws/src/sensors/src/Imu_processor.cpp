@@ -7,6 +7,14 @@
 
 namespace sensors
 {
+/// Helper function to convert a 3x3 Eigen matrix to a flat row-major std::array of size 9
+std::array<double, 9> to_row_major_array(const Eigen::Matrix3d& matrix)
+{
+    std::array<double, 9> result{};
+    Eigen::Map<Eigen::Matrix<double, 3, 3, Eigen::RowMajor>>(
+        result.data()) = matrix;
+    return result;
+}
 /// Creates the IMU processor, reads mounting and yaw-correction parameters,
 /// and subscribes to IMU data and optionally DVL dead-reckoning yaw.
 ImuProcessor::ImuProcessor()
@@ -94,6 +102,18 @@ Vec3 ImuProcessor::rotate_gyro(const Vec3& w_s) const
     return w_v;
 }
 
+/// Rotates an imu covariance matrix from IMU sensor axes into vehicle axes.
+////
+/// Args:
+///   covariance_s: 3x3 covariance matrix expressed in sensor axes.
+/// Returns:
+///   3x3 covariance matrix expressed in vehicle axes.
+Eigen::Matrix3d ImuProcessor::rotate_covariance(const Eigen::Matrix3d& covariance_s) const
+{
+    Eigen::Matrix3d rotation = q_vs_.toRotationMatrix();
+    return rotation * covariance_s * rotation.transpose();
+}
+
 /// Copies raw IMU acceleration, angular velocity, and orientation into Eigen values.
 ///
 /// Args:
@@ -108,6 +128,9 @@ ImuDataRawFrame ImuProcessor::parse_imu(const imu_msg& imu_in_msg) const
     imu_raw.f_s << imu_in_msg.linear_acceleration.x, imu_in_msg.linear_acceleration.y, imu_in_msg.linear_acceleration.z;
     imu_raw.w_s << imu_in_msg.angular_velocity.x, imu_in_msg.angular_velocity.y, imu_in_msg.angular_velocity.z;
     imu_raw.q_is = quatd(imu_in_msg.orientation.w, imu_in_msg.orientation.x, imu_in_msg.orientation.y, imu_in_msg.orientation.z);
+    imu_raw.orientation_covariance = Eigen::Map<const Eigen::Matrix<double, 3, 3, Eigen::RowMajor>>(imu_in_msg.orientation_covariance.data());
+    imu_raw.angular_velocity_covariance = Eigen::Map<const Eigen::Matrix<double, 3, 3, Eigen::RowMajor>>(imu_in_msg.angular_velocity_covariance.data());
+    imu_raw.linear_acceleration_covariance = Eigen::Map<const Eigen::Matrix<double, 3, 3, Eigen::RowMajor>>(imu_in_msg.linear_acceleration_covariance.data());
     return imu_raw;
 }
 
@@ -128,6 +151,9 @@ ImuDataAUVFrame ImuProcessor::process_imu(const ImuDataRawFrame& imu_raw) const
     imu_auv.w_v = rotate_gyro(imu_raw.w_s);
     imu_auv.q_iv = imu_raw.q_is * q_sv_;
     imu_auv.q_iv = sensors::math::canonicalizeShortest(imu_auv.q_iv);
+    imu_auv.orientation_covariance = rotate_covariance(imu_raw.orientation_covariance);
+    imu_auv.linear_acceleration_covariance = rotate_covariance(imu_raw.linear_acceleration_covariance);
+    imu_auv.angular_velocity_covariance = rotate_covariance(imu_raw.angular_velocity_covariance);
     return imu_auv;
 }
 
@@ -158,6 +184,10 @@ imu_msg ImuProcessor::compose_imu_msg(const ImuDataAUVFrame& imu_auv) const
     imu_out_msg.orientation.x = imu_auv.q_iv.x();
     imu_out_msg.orientation.y = imu_auv.q_iv.y();
     imu_out_msg.orientation.z = imu_auv.q_iv.z();
+
+    imu_out_msg.orientation_covariance = to_row_major_array(imu_auv.orientation_covariance);
+    imu_out_msg.angular_velocity_covariance = to_row_major_array(imu_auv.angular_velocity_covariance);
+    imu_out_msg.linear_acceleration_covariance = to_row_major_array(imu_auv.linear_acceleration_covariance);
 
     return imu_out_msg;
 }

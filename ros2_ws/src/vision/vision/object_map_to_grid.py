@@ -7,6 +7,7 @@ from auv_msgs.msg import VisionObjectArray
 from nav_msgs.msg import OccupancyGrid
 from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
+from controls.controls.utils import yaw_from_quaternion
 
 
 class ObjectMapToGrid(Node):
@@ -83,16 +84,13 @@ class ObjectMapToGrid(Node):
             size_y = obj.size.y
             if size_x <= 0.0 or size_y <= 0.0:
                 size_x, size_y = self.fallback_sizes.get(obj.label, (0.0, 0.0))
-            if size_x <= 0.0 or size_y <= 0.0:
-                continue
+                if size_x <= 0.0 or size_y <= 0.0:
+                    continue
 
             center_x = obj.pose.position.x
             center_y = obj.pose.position.y
             quat = obj.pose.orientation
-            yaw = math.atan2(
-                2.0 * (quat.w * quat.z + quat.x * quat.y),
-                1.0 - 2.0 * (quat.y * quat.y + quat.z * quat.z),
-            )
+            yaw = yaw_from_quaternion(quat)
             cosine = math.cos(yaw)
             sine = math.sin(yaw)
 
