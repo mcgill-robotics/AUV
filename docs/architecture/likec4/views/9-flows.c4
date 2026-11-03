@@ -50,7 +50,7 @@ views {
         A goal is a request: controls answers later with success or failure. Inside controls: **Flow 5**.
 
         Before any goal: on the real vehicle the four controllers start disabled (`enabled: false`), so nothing moves by accident.
-        After the 30 s `startup_delay`, the tree switches them on with `set_parameters`.
+        After a mission number arrives on `/mission_selector` and the 30 s `startup_delay`, the tree switches them on with `set_parameters`.
       '''
     }
     auv.controls -> auv.propulsion 'One wrench (force + torque)' {
@@ -113,7 +113,11 @@ views {
       auv.sensors.stateAgg.dvlIn -> auv.sensors.stateAgg.poseOut 'x, y'
     }
     auv.sensors.stateAgg.poseOut -> auv.controls 'state/pose, 50 Hz: yaw 10 degrees' {
-      notes 'The same topic goes to the planner and the down camera. Everyone agrees on where the vehicle is.'
+      notes '''
+        The same topic goes to the planner and the down camera. Everyone agrees on where the vehicle is.
+
+        ![state/pose: orientation from the IMU, x and y from the DVL, z is minus the depth](img/pose-fusion.svg)
+      '''
     }
   }
 
@@ -139,7 +143,7 @@ views {
       notes '''
         Depth comes from a method chosen per label. Stereo depth is noisy on thin or plain objects like pipes and the gate.
 
-        Then the flat-port correction: water bends the light at the camera window, so everything looks closer than it is.
+        Then the flat-port correction: water bends the light at the camera window, so everything looks closer than it is. Two fixes: the depth is scaled up (1.4 in the centre, more toward the left and right edges; only when the depth comes from the stereo depth map), and x and y are bent back with Snell.
 
         ![Flat port: the ray bends at the window, the object looks closer](img/flat-port.svg)
       '''
@@ -162,6 +166,10 @@ views {
 
     auv.vision.map.xform -> auv.vision.map.tracker.cost 'Detections in pool_link' {
       notes '''
+        How a detection gets into pool_link:
+
+        ![From the camera frame to pool_link](img/to-pool-frame.svg)
+
         Each object on the course gets a track: a Kalman filter on its position. Nothing on the course moves, so the model is static.
 
         ![Track life: tentative, confirmed, back to tentative, deleted](img/tracker-lifecycle.svg)
@@ -196,12 +204,22 @@ views {
     auv.controls.nav.execute -> auv.controls.nav.publishSp 'Target'
     parallel {
       auv.controls.nav.publishSp -> auv.controls.planar 'x_setpoint'
-      auv.controls.nav.publishSp -> auv.controls.depthCtl 'depth_setpoint'
+      auv.controls.nav.publishSp -> auv.controls.depthCtl 'depth_setpoint' {
+        notes '''
+          Each controller turns its own error into an effort.
+
+          ![PID with feed-forward, worked through for depth](img/pid-loop.svg)
+        '''
+      }
       auv.controls.nav.publishSp -> auv.controls.attitude 'quaternion_setpoint'
     }
     auv.sensors -> auv.controls.nav.execute 'state/pose, every cycle'
     auv.controls.nav.execute -> auv.controls.nav.errors 'How far from the target?' {
-      notes 'The clock starts when the error is inside the tolerance. The goal succeeds after it stays there for hold_time.'
+      notes '''
+        The clock starts when the error is inside the tolerance. The goal succeeds after it stays there for hold_time.
+
+        ![A goal succeeds after the error stays inside the tolerance for hold_time](img/nav-hold.svg)
+      '''
     }
     auv.controls.nav.execute -[reply]-> auv.planner.tasks 'Feedback at 10 Hz, then success or failure' {
       color green
@@ -254,7 +272,11 @@ views {
     autoLayout TopBottom
 
     auv.propulsion.mapper.pwm -> auv.tcp 'propulsion/forces, eight values in newtons' {
-      notes 'thrust_mapper publishes the forces as well as the PWM. On the real vehicle nothing reads the forces. In the sim, Unity does.'
+      notes '''
+        thrust_mapper publishes the forces as well as the PWM. On the real vehicle nothing reads the forces. In the sim, Unity does.
+
+        ![The sim loop](img/sim-loop.svg)
+      '''
     }
     auv.tcp -> sim.physics.thrusters 'TCP, port 10000'
     sim.physics.thrusters -> sim.physics.body 'Force at each thruster (ramped and clamped)'
@@ -275,7 +297,11 @@ views {
 
     sim.synth.batch -> sim.synth.randomizers 'A batch sets water, camera and object ranges'
     sim.synth.randomizers -> sim.synth.labelers 'Scene is built. Camera takes a frame.' {
-      notes 'Labels come free: Unity knows where every object is. Water, camera and textures change every frame so the model does not memorise one look.'
+      notes '''
+        Labels come free: Unity knows where every object is. Water, camera and textures change every frame so the model does not memorise one look.
+
+        ![Synthetic data, step by step](img/synth-data.svg)
+      '''
     }
     sim.synth.labelers -> sim.solo 'SOLO files (Unity Perception output: JSON + PNG)'
     sim.solo -> sim.converter 'Tools > RoboSub > YOLO Converter'

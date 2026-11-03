@@ -36,11 +36,19 @@ There are 22 views. You do not need all of them. Start with views 1, 2, 3, then 
 ## Reading the diagrams
 
 - **Blue boxes** are apps (a ROS package or a Unity subsystem). **Indigo boxes** are nodes or scripts inside them.
-- **Green cylinders** hold data. **Grey boxes** are things we do not own (hardware, ZED SDK, Roboflow).
+- **Green cylinders** hold data. **Light grey boxes** are physical devices. **Dark grey boxes** are software we do not own (ZED SDK, Roboflow).
+- **Grey dashed arrows** are data on a topic. **Amber dotted** is a request that waits for an answer (a service call or an action goal). **Green dotted** is that answer, in flows only. **Grey solid** is bringup starting a package.
 - **Arrow labels** are topic, service or action names.
-- A label of `[...]` means several arrows were merged. Zoom in to see them.
-- Frames: `pool_link` is fixed at the deployment point. `auv_link` is the vehicle, x forward, y left, z up. Depth is negative below the surface.
+- Frames: `pool_link` is fixed at the deployment point. `auv_link` is the vehicle, x forward, y left, z up. In `state/pose`, z is negative below the surface. The depth topics are positive down.
+- View 1 has the full legend and a short glossary.
+
+## Drawings
+
+The hand-drawn pictures (flat port, PID, tracker life, thrusters and more) are made by `likec4/drawings/make.mjs` with rough.js, the library behind Excalidraw.
+They show in a box's side panel, in a view's description, and in the flow steps.
+Every number in them comes from the code or a config file, noted next to each drawing. To change one, edit `make.mjs` and run `npm run drawings`.
 
 ## Keeping it true
 
 When you change a topic name, a node or a launch flag, change the matching file in `likec4/model/` in the same pull request.
+If you change a number that a drawing shows (gains, limits, distances), update `make.mjs` too.

@@ -12,12 +12,14 @@ model {
     xform = component 'Move into pool_link' {
       technology 'object_map · detection_callback, down_cam_detection_callback'
       summary 'Each detection arrives in the camera frame with the AUV pose attached. Turn it into pool_link.'
-      description '
+      description '''
         pool_link position = AUV pose snapshot x TF(auv_link to camera) x camera position.
         Drops pipes beyond 7 m and anything outside the lane boundary.
         Grows the covariance with distance. Skips the frame if the TF is missing.
         Front and down detections use the same steps, then go to separate tracker instances.
-      '
+
+        ![From the camera frame to pool_link](img/to-pool-frame.svg)
+      '''
     }
     tracker = component 'Track objects' {
       technology 'object_map · ObjectTracker'
@@ -123,7 +125,12 @@ model {
         depth_map_median, depth_map_nearest (10th percentile), zed_3d (bin), known_height, ray to surface or floor (octagon).
         Stereo depth is noisy on thin or plain objects like pipes and the gate, so those use other methods.
 
-        Then the flat-port correction (`apply_snells_law_depth`, `apply_snells_law_lateral` in `object_detection/utils.py`):
+        Then the flat-port correction, in two parts (`object_detection/utils.py`):
+        - **Depth** (`apply_snells_law_depth`): ZED depth times a dynamic scale, `depth_scale × cos³(water angle) / cos³(air angle)`.
+          Only for the depth-map and zed_3d methods. `depth_scale` is 1.4. Only the horizontal angle is used, because ZED depth comes from horizontal disparity.
+          Using the full angle would bend flat objects into a Pringle shape. The scale is smallest in the centre and grows toward the left and right edges.
+        - **Lateral** (`apply_snells_law_lateral`): the pixel's ray angle is bent back with Snell (index 1.333), then x and y are taken at the corrected depth. Every method does this.
+        - known_height gets its distance from the box height, with Snell applied to that angle.
 
         ![Flat port: the ray bends at the window, the object looks closer](img/flat-port.svg)
 
@@ -169,6 +176,9 @@ model {
     poseOut = component 'Publish state/pose' {
       technology 'state_aggregator · pose assembly, 50 Hz'
       summary 'Combines the three into state/pose. Optional TF from pool_link to auv_link.'
+      description '''
+        ![state/pose: orientation from the IMU, x and y from the DVL, z is minus the depth](img/pose-fusion.svg)
+      '''
     }
   }
   auv.sensors.imuProc -> auv.sensors.stateAgg.imuIn 'auv_frame/imu'
@@ -190,7 +200,11 @@ model {
     execute = component 'Run the goal' {
       technology 'navigation_server · _execute_callback'
       summary 'Loops while the goal is active. Ends on success or timeout.'
-      description 'Computes the target, publishes setpoints, checks the error every cycle, tracks time in tolerance, sends feedback at 10 Hz.'
+      description '''
+        Computes the target, publishes setpoints, checks the error every cycle, tracks time in tolerance, sends feedback at 10 Hz.
+
+        ![A goal succeeds after the error stays inside the tolerance for hold_time](img/nav-hold.svg)
+      '''
     }
     target = component 'Compute target' {
       technology 'navigation_server · _compute_absolute_target'

@@ -2,13 +2,15 @@
 model {
   extend auv.planner {
     tree = component 'Behaviour tree' {
-      summary 'py_trees root tree. Ticks at 3 Hz after a 30 s start delay.'
+      summary 'py_trees root tree, ticked 3 times a second. Waits for a mission number, then 30 s, then runs it.'
       description '''
         The tree calls ("ticks") the running task 3 times a second. Each tick the task answers: still running, succeeded, or failed.
         `root_tree.py` builds the mission from `behaviour_tree_params.yaml`.
 
-        At start it waits (`startup_delay`), then **enables the four controllers**: on the real vehicle they start with `enabled: false`.
-        It also starts rosbag recording by default.
+        It waits for a mission number on `/mission_selector`, waits `startup_delay` (30 s), then **enables the four controllers**:
+        on the real vehicle they start with `enabled: false`. The mission is recorded to a rosbag by default.
+
+        ![The mission tree](img/mission-tree.svg)
       '''
       technology 'py_trees_ros'
     }

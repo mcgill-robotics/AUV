@@ -7,6 +7,7 @@ views {
       Three systems make that work: the software on the vehicle, a Unity simulator, and a pipeline that trains the camera detector.
 
       **How to use this:** click a box to open it. The flows at the end walk through one piece of data, step by step: press **Start**.
+      Many boxes and flow steps have a hand-drawn picture: open the box's details (the small icon in its corner) or step through the flow.
 
       **Boxes:** blue is our software, indigo is one node or one part inside it, light grey is a physical device,
       dark grey is software we do not own, green holds data.

@@ -3,7 +3,11 @@
 views {
   view mapDeep of auv.vision.map {
     title '8. object_map: detections to a persistent map'
-    description 'Detections arrive with a 3D position already computed (by the detectors). object_map moves them into pool_link, tracks them, and publishes the map. Unique objects stay.'
+    description '''
+      Detections arrive with a 3D position already computed (by the detectors). object_map moves them into pool_link, tracks them, and publishes the map. Unique objects stay.
+
+      ![From the camera frame to pool_link](img/to-pool-frame.svg)
+    '''
     autoLayout LeftRight
     include auv.vision.map.*
     include auv.vision.map.tracker with {
@@ -24,7 +28,11 @@ views {
 
   view stateAggDeep of auv.sensors.stateAgg {
     title '10. state_aggregator: three inputs, one pose'
-    description 'Orientation from the IMU, z from depth, x and y from the DVL. One message, state/pose, for everyone.'
+    description '''
+      Orientation from the IMU, z from depth, x and y from the DVL. One message, state/pose, for everyone.
+
+      ![state/pose: orientation from the IMU, x and y from the DVL, z is minus the depth](img/pose-fusion.svg)
+    '''
     autoLayout LeftRight
     include auv.sensors.stateAgg.*
     include auv.sensors.imuProc, auv.sensors.depthProc, auv.sensors.dvlProc

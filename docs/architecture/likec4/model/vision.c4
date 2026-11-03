@@ -9,7 +9,7 @@ model {
         2. RF-DETR inference, threshold 0.60.
         3. Border filter on pipes, gate and bin. Gate box cropped to its top half.
         4. Pick a depth method per label (see below).
-        5. Undo the flat-port bending (Snell). Depth scale 1.4, refractive index 1.333 (the param is named lateral_scale).
+        5. Undo the flat-port bending, in two parts: scale the depth (1.4 in the centre, more toward the left and right edges; depth-map and zed_3d methods only), then fix x and y with Snell (index 1.333, the param is named lateral_scale). known_height uses Snell on the box height instead, and the plane methods only need the x, y fix.
         6. Build a covariance. Publish the frame with the pose attached.
 
         Depth methods, set per label in vision_pipeline.yaml:

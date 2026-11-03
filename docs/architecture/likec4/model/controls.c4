@@ -18,7 +18,11 @@ model {
     }
     depthCtl = component 'depth_controller' {
       summary 'Depth PID with a buoyancy feed-forward.'
-      description 'In: auv_frame/depth, depth_setpoint. Out: /controls/depth_effort (Wrench). 10 Hz.'
+      description '''
+        In: auv_frame/depth, depth_setpoint. Out: /controls/depth_effort (Wrench). 10 Hz.
+
+        ![PID with feed-forward, worked through for depth](img/pid-loop.svg)
+      '''
       technology 'Python'
     }
     planar = component 'planar controllers (x, y)' {

@@ -83,7 +83,7 @@ model {
       description '
         Hidden/UnderwaterRefraction. Index 1.333, focal length, principal point and resolution
         (default 504.6 px, 672x376) match the real ZED.
-        Training on undistorted images would hurt on the real camera. The vision code undoes the bend with Snell.
+        So the vision code sees the same bend in the sim as on the vehicle, and undoes it with Snell.
       '
       technology 'Shaders/UnderwaterRefraction.shader'
     }
@@ -138,4 +138,5 @@ model {
   sim.camera.refraction -> sim.camera.zedSender 'bent image'
   sim.camera.zedSender -> zed 'network stream, port 30000'
   sim.simsensors.delay -> sim.simsensors.sdvl 'latency'
+  sim.simsensors.delay -> sim.simsensors.simu 'latency'
 }
