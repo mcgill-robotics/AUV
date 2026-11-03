@@ -3,7 +3,13 @@ model {
   extend auv.planner {
     tree = component 'Behaviour tree' {
       summary 'py_trees root tree. Ticks at 3 Hz after a 30 s start delay.'
-      description 'root_tree.py builds the mission from behaviour_tree_params.yaml. The start delay is what holds the mission back, since bringup starts everything at once.'
+      description '''
+        The tree calls ("ticks") the running task 3 times a second. Each tick the task answers: still running, succeeded, or failed.
+        `root_tree.py` builds the mission from `behaviour_tree_params.yaml`.
+
+        At start it waits (`startup_delay`), then **enables the four controllers**: on the real vehicle they start with `enabled: false`.
+        It also starts rosbag recording by default.
+      '''
       technology 'py_trees_ros'
     }
     tasks = component 'Mission tasks' {
@@ -21,7 +27,7 @@ model {
         state/pose, auv_frame/dvl/velocity, /dvl/velocity, /vision/object_map, /vision/down_cam/detection_frame.
         In sim with use_ground_truth, pose and twist come from /auv/ground_truth/* instead.
         Behaviours only read from here, which keeps them easy to test.
-        Nothing checks message age. Staleness is judged by frames_since_last_seen on each object.
+        Nothing checks message age. Staleness is judged by frames_since_last_seen on each object, which freezes for remembered objects (see object_map).
       '
     }
   }
@@ -30,5 +36,6 @@ model {
   auv.planner.tree -> auv.planner.tasks 'ticks'
   auv.sensors.stateAgg.poseOut -> auv.planner.board 'state/pose'
   auv.sensors.dvlProc -> auv.planner.board 'auv_frame/dvl/velocity'
-  auv.planner.tree -> auv.telemetry.rosbagMgr 'start and stop recording'
+  auv.planner.tree -[call]-> auv.telemetry.rosbagMgr 'start and stop recording'
+  auv.planner.tree -[call]-> auv.controls 'enable the controllers at start (set_parameters)'
 }

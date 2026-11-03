@@ -1,17 +1,46 @@
 // Start here. Three views: the whole picture, the vehicle's loop, and how hardware connects.
 views {
   view index {
-    title '1. The whole picture'
-    description 'Start here. Click a box to zoom into it.'
+    title '1. Start here: the whole picture'
+    description '''
+      The AUV runs the RoboSub course on its own: find the gate, go through it, then do the next task.
+      Three systems make that work: the software on the vehicle, a Unity simulator, and a pipeline that trains the camera detector.
+
+      **How to use this:** click a box to open it. The flows at the end walk through one piece of data, step by step: press **Start**.
+
+      **Boxes:** blue is our software, indigo is one node or one part inside it, light grey is a physical device,
+      dark grey is software we do not own, green holds data.
+
+      **Arrows:** grey dashed is data on a ROS topic. Amber dotted is a request that waits for an answer (a service call or an action goal).
+      Green dotted with an open arrowhead is that answer (flows only). Grey solid is bringup starting a package.
+
+      **Words you will see**
+      - **IMU**: measures orientation and rotation. **DVL** (Doppler velocity log): measures speed over the pool floor.
+      - **Topic**: a named stream of ROS messages. **Service / action**: a request with an answer. An action also sends progress.
+      - **pool_link**: the fixed frame of the pool, set where the vehicle starts. **auv_link**: the frame that moves with the vehicle.
+        Topics starting with `auv_frame/` are already converted into the vehicle frame.
+      - **state/pose**: the one fused position and orientation of the vehicle.
+      - **Setpoint**: a target value for one controller. **Wrench**: a force plus a torque. **PWM**: the pulse width sent to a thruster's speed controller (**ESC**).
+      - **micro-ROS**: lets small boards with firmware talk ROS over a serial cable.
+      - **VIO**: position estimated from the camera images (ZED). **TensorRT engine**: the detector compiled for the Jetson GPU.
+    '''
     include operator, auv, sim, training, hw, zed, roboflow
   }
 
   view mainLoop of auv {
     title '2. The AUV software: sense, decide, move'
-    description 'Everything that touches hardware goes through the drivers. Cameras are read by vision directly (view 3).'
+    description '''
+      Read left to right: sensors and vision describe the world, the planner decides, controls and propulsion move the vehicle.
+      Everything that touches hardware goes through the drivers (view 3). Cameras are read by vision directly.
+
+      ![The two frames: pool_link is fixed, auv_link moves with the vehicle](img/frames.svg)
+    '''
     autoLayout LeftRight
     include auv.sensors, auv.vision, auv.planner, auv.controls, auv.propulsion, auv.teleop
     include auv.drivers, operator
+    // Answers going back up, and side channels, are in the flows. Here they only add loops.
+    exclude auv.controls -> auv.planner
+    exclude auv.drivers -> auv.propulsion, auv.planner -> auv.drivers
   }
 
   view hardware of hw {
@@ -21,5 +50,6 @@ views {
     include hw.*
     include auv.drivers.*
     include zed, auv.sensors, auv.propulsion, auv.vision.front, auv.vision.down
+    exclude auv.sensors -> auv.vision.front, auv.sensors -> auv.vision.down
   }
 }

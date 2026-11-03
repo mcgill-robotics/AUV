@@ -9,7 +9,7 @@ model {
         2. RF-DETR inference, threshold 0.60.
         3. Border filter on pipes, gate and bin. Gate box cropped to its top half.
         4. Pick a depth method per label (see below).
-        5. Undo the flat-port bending (Snell). Depth scale 1.4, lateral scale 1.333.
+        5. Undo the flat-port bending (Snell). Depth scale 1.4, refractive index 1.333 (the param is named lateral_scale).
         6. Build a covariance. Publish the frame with the pose attached.
 
         Depth methods, set per label in vision_pipeline.yaml:
@@ -22,12 +22,13 @@ model {
     }
     down = component 'down_cam_object_detection' {
       summary 'Finds objects on the floor and projects the pixel onto a plane.'
-      description '
-        No depth sensor. Take the pixel (mask centroid), turn it into a ray with Snell,
-        and intersect it with a plane at a known height (0.67 for table items, 0.0 for lane markers).
-        The planner can change the heights at runtime, once the DVL has measured the table.
-        Yaw comes from minAreaRect on the largest contour.
-      '
+      description '''
+        No depth sensor. Take the pixel (mask centroid), turn it into a ray (Snell), and stop it at a plane of known height.
+        The planner can change the heights at runtime once the DVL has measured the table.
+        Yaw comes from the largest contour (`minAreaRect`).
+
+        ![Down camera: the ray stops at a plane of known height](img/downcam-projection.svg)
+      '''
       technology 'Python, RF-DETR segmentation'
     }
     enhance = component 'image_enhancement' {
@@ -40,7 +41,7 @@ model {
       description '
         Pose snapshot x camera transform puts each detection in pool_link.
         Pipes beyond 7 m are dropped, and detections outside the lane boundary.
-        Unique objects (gate, table, octagon, board, bin_structure) are kept forever once seen.
+        Unique objects, the one-per-course objects (gate and both panels, table and its items, octagon, board and its icons, bin_structure; unique_objects in vision_pipeline.yaml), are kept forever once confirmed.
         Pipes, bins and lane markers appear only while their track is confirmed.
         Gate: the two role panels pull the gate to their midpoint and set its facing direction.
         Service ~/clear empties the map.
@@ -49,10 +50,9 @@ model {
     }
   }
 
-  auv.models -> auv.vision.front 'ONNX or engine'
-  auv.models -> auv.vision.down 'ONNX or engine'
-  auv.vision.enhance -> auv.vision.front 'image_enhanced (optional)'
-  auv.vision.enhance -> auv.vision.down 'image_enhanced (optional)'
+  auv.models -> auv.vision.front.infer 'ONNX model or TensorRT engine'
+  auv.models -> auv.vision.down 'ONNX model or TensorRT engine'
+  auv.vision.enhance -> auv.vision.front 'image_enhanced (off by default)'
+  auv.vision.enhance -> auv.vision.down 'image_enhanced (off by default)'
   auv.vision.down -> auv.planner.board 'down_cam/detection_frame'
-  auv.planner.tasks -> auv.vision.down 'set_projection_heights'
 }

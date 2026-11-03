@@ -3,11 +3,13 @@
   "private": true,
   "description": "Architecture diagrams for the AUV stack, written in LikeC4",
   "scripts": {
-    "start": "likec4 start",
+    "start": "likec4 start --public public",
     "validate": "likec4 validate",
-    "build": "likec4 build -o dist"
+    "build": "likec4 build -o dist --public public",
+    "drawings": "node drawings/make.mjs"
   },
   "devDependencies": {
-    "likec4": "^1.60.0"
+    "likec4": "^1.60.0",
+    "roughjs": "^4.6.6"
   }
 }

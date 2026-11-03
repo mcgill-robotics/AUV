@@ -6,7 +6,7 @@ model {
     summary 'Drives with an Xbox controller, watches in Foxglove.'
   }
 
-  hw = external 'AUV Hardware' {
+  hw = device 'AUV Hardware' {
     summary 'The physical devices. Each reaches the software through its own path.'
   }
   zed = external 'ZED SDK' {
@@ -40,9 +40,14 @@ model {
     }
     sensors = app 'sensors' {
       summary 'Raw sensors in, one fused pose out.'
+      description '''
+        Every sensor is converted into the AUV frame once, then fused into `state/pose`.
+
+        ![The two frames: pool_link is fixed, auv_link moves with the vehicle](img/frames.svg)
+      '''
     }
     controls = app 'controls' {
-      summary 'A goal in, one total wrench out.'
+      summary 'A goal in, one total wrench out. The controllers start disabled; the planner turns them on.'
     }
     propulsion = app 'propulsion' {
       summary 'Wrench to eight thruster forces to PWM.'
@@ -60,7 +65,7 @@ model {
       summary 'Foxglove bridge, scene markers, rosbag recording.'
     }
     models = store 'Model packages' {
-      summary 'vision/models/<name>/: weights.onnx, engine.plan, class_names.txt, configs.'
+      summary 'One folder per model: ONNX weights, TensorRT engine (engine.plan), class names, configs.'
     }
     bags = store 'Rosbags' {
       summary 'Recordings in ~/AUV/rosbags.'

@@ -14,7 +14,7 @@ model {
       summary 'Depth sensor to AUV depth, with lever-arm correction.'
       description '
         In: /sensors/depth/z (Float64), auv_frame/imu.
-        Out: auv_frame/depth (Float64). Negative below the surface.
+        Out: auv_frame/depth (Float64), positive down. state_aggregator negates it into state/pose z, which is negative below the surface.
         The sensor sits off-centre, so a tilted vehicle would read a wrong depth. The IMU orientation fixes that.
         Service /depth_processor/calibrate zeros it at the surface.
       '
@@ -40,7 +40,7 @@ model {
       technology 'C++'
     }
     health = component 'health monitors' {
-      summary 'Watch IMU and DVL rates and publish /diagnostics.'
+      summary 'Watch IMU and DVL rates and publish /diagnostics. Separate launch: sensor_health.launch.py.'
       technology 'Python'
     }
   }

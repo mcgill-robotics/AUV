@@ -28,6 +28,20 @@ model {
     }
   }
 
+  extend sim.physics {
+    body = component 'Vehicle rigidbody' {
+      summary 'Unity rigidbody. Every force lands here. Its pose and velocity are what the sensors sample.'
+    }
+  }
+  sim.physics.thrusters -> sim.physics.body 'force at each thruster'
+  sim.physics.buoyancy -> sim.physics.body 'lift at the centre of buoyancy'
+  sim.physics.drag -> sim.physics.body 'drag and added mass'
+  sim.physics -> sim.simsensors 'pose and velocity'
+  sim.physics.body -> sim.simsensors.sdvl 'velocity'
+  sim.physics.body -> sim.simsensors.simu 'orientation and rates'
+  sim.physics.body -> sim.simsensors.sdepth 'position'
+  sim.physics.body -> sim.simsensors.gt 'pose'
+
   extend sim.simsensors {
     sdvl = component 'DVL' {
       summary 'Four raycast beams with noise, bias and dropouts.'
@@ -44,12 +58,12 @@ model {
       technology 'Sensors/IMUPublisher.cs'
     }
     sdepth = component 'Depth sensor' {
-      summary 'Depth is -Y position plus noise and bias.'
+      summary 'Depth is positive down (-Y position), plus noise and bias. Same as the real sensor.'
       technology 'Sensors/DepthPublisher.cs'
     }
     gt = component 'Ground truth' {
       summary 'Perfect pose, twist and object detections. For testing the planner without vision.'
-      description 'Publishes /auv/ground_truth/*, and /vision/object_map directly through GroundTruthVisionPublisher.'
+      description 'Publishes /auv/ground_truth/*. GroundTruthVisionPublisher also publishes /vision/object_map, the same topic as the real object_map node: run only one of the two.'
       technology 'Sensors/GroundTruth*.cs'
     }
     delay = component 'Sensor delay buffer' {

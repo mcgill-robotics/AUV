@@ -1,20 +1,22 @@
 // Three nodes that are worth opening. The others are covered by flows.
-// Every box here is a real function or class in the code.
+// Box names say what each part does; the small line is node · function.
 views {
   view mapDeep of auv.vision.map {
     title '8. object_map: detections to a persistent map'
-    description 'Detections move into pool_link, get tracked, and are published. Unique objects stay.'
+    description 'Detections arrive with a 3D position already computed (by the detectors). object_map moves them into pool_link, tracks them, and publishes the map. Unique objects stay.'
     autoLayout LeftRight
     include auv.vision.map.*
     include auv.vision.map.tracker with {
       navigateTo trackerFlow
     }
     include auv.vision.front, auv.vision.down, auv.planner
+    // The down camera also talks to the planner directly. Not part of this story.
+    exclude auv.planner -> auv.vision.down, auv.vision.down -> auv.planner
   }
 
   view frontDeep of auv.vision.front {
     title '9. front_cam_object_detection: image to 3D detections'
-    description 'One frame: capture, pose snapshot, detect, locate in 3D, publish.'
+    description 'One frame: capture, take a pose snapshot, detect, locate in 3D, publish. By default the pose comes from the ZED VIO, not state/pose.'
     autoLayout LeftRight
     include auv.vision.front.*
     include zed, auv.sensors, auv.vision.map, auv.models
@@ -22,10 +24,13 @@ views {
 
   view stateAggDeep of auv.sensors.stateAgg {
     title '10. state_aggregator: three inputs, one pose'
-    description 'Orientation from the IMU, z from depth, x and y from the DVL.'
+    description 'Orientation from the IMU, z from depth, x and y from the DVL. One message, state/pose, for everyone.'
     autoLayout LeftRight
     include auv.sensors.stateAgg.*
     include auv.sensors.imuProc, auv.sensors.depthProc, auv.sensors.dvlProc
     include auv.controls, auv.planner, auv.vision
+    exclude auv.controls -> auv.planner, auv.planner -> auv.controls, auv.planner -> auv.vision, auv.vision -> auv.planner
+    exclude auv.sensors.imuProc -> auv.controls, auv.sensors.depthProc -> auv.controls, auv.sensors.dvlProc -> auv.controls
+    exclude auv.sensors.dvlProc -> auv.planner
   }
 }

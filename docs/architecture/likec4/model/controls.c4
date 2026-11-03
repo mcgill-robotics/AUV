@@ -30,7 +30,7 @@ model {
       summary 'Adds all efforts into one wrench and rotates it into the body frame.'
       description '
         In: the four efforts, auv_frame/imu.
-        Out: /controls/total_effort (Wrench), 30 Hz.
+        Out: /controls/total_effort (Wrench), 40 Hz.
         Depth and planar efforts are in the pool frame. It rotates them with the inverse IMU quaternion,
         clamps them, then adds the attitude torque.
         It is the only place that makes the final wrench, which is why teleop can plug in here too.
