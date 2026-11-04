@@ -1175,13 +1175,13 @@ class SendActuateGrabberCommand(py_trees.behaviour.Behaviour):
 
     def setup(self, **kwargs):
         self.node = kwargs['node']
-        self.node.create_publisher(UInt8, "/actuator/grabber", 10)
+        self.publisher = self.node.create_publisher(UInt8, "/actuators/grabber", 10)
 
     def update(self):
         # Send the command to actuate the grabber
         msg = UInt8()
         msg.data = 255 if self.open else 0
-        self.node.publish("/actuator/grabber", msg)
+        self.publisher.publish(msg)
 
         return py_trees.common.Status.SUCCESS
 
