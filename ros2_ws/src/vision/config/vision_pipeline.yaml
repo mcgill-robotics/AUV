@@ -173,7 +173,7 @@ front_cam_object_detection:
 
 
     stream: # may be used by ZED ROS Wrapper or ZED SDK directly
-      ip: "127.0.1.1" # may be used by ZED ROS Wrapper or ZED SDK directly
+      ip: "127.0.1.1" # default for the zed_stream_ip launch argument, which overrides it
       port: 30000
     # Dataset collection
     collection_interval_seconds: 2.0 # seconds between saved frames when collection is active

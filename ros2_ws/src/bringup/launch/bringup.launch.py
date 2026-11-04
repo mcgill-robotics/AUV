@@ -28,6 +28,12 @@ def generate_launch_description():
         description="Enable object detection inference in the vision pipeline globally",
     )
     
+    zed_stream_ip_arg = DeclareLaunchArgument(
+        "zed_stream_ip",
+        default_value="127.0.1.1",
+        description="IP of the ZED stream used by vision in sim mode (the simulator's ZED stream)",
+    )
+
     controls_condition = DeclareLaunchArgument(
         "controls",
         default_value="true",
@@ -151,7 +157,8 @@ def generate_launch_description():
                 PythonLaunchDescriptionSource(vision_launch_file),
                 launch_arguments={
                     "sim": sim,
-                    "enable_object_detection": enable_object_detection
+                    "enable_object_detection": enable_object_detection,
+                    "zed_stream_ip": LaunchConfiguration("zed_stream_ip"),
                 }.items(),
             )
         ],
@@ -197,6 +204,7 @@ def generate_launch_description():
         sim_condition,
         vision_condition,
         enable_object_detection_arg,
+        zed_stream_ip_arg,
         controls_condition,
         sensors_condition,
         propulsion_condition,
