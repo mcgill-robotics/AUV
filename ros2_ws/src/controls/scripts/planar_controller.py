@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 import math
-import time
 import rclpy
 from rclpy.executors import SingleThreadedExecutor
 from rclpy.node import Node
@@ -25,8 +24,9 @@ class PlanarCoordinator:
         self.enabled_y = False
         self.last_update_time = None
 
-    def update(self, time_step):
-        now = time.time()
+    def update(self, time_step, now):
+        # `now` comes from the calling node's clock so this follows sim time.
+        # Both axis controllers call update() each cycle; only the first one steps.
         if self.last_update_time is not None and (now - self.last_update_time) < (time_step * 0.5):
             return
         self.last_update_time = now
@@ -275,7 +275,7 @@ class AxisController(Node):
             self.coordinator.max_slew_rate_y = self.max_slew_rate
             self.coordinator.enabled_y = self.enabled
         # Update shared 2D planar slew-rate coordinator
-        self.coordinator.update(self.time_step)
+        self.coordinator.update(self.time_step, now)
         if self.axis_name == 'x':
             self.setpoint = self.coordinator.setpoint_x
         elif self.axis_name == 'y':

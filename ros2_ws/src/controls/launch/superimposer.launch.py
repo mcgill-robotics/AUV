@@ -25,7 +25,7 @@ def generate_launch_description():
         executable="superimposer",
         name="superimposer",
         output="screen",
-        parameters=[sim_yaml],
+        parameters=[sim_yaml, {"use_sim_time": True}],
         condition=IfCondition(sim),
     )
 
