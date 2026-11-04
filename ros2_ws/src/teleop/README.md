@@ -25,6 +25,13 @@ ros2 run teleop keyboard_to_joy
 ```
 *(Keep Terminal 2 focused to send keyboard commands)*
 
+### 3. Against the simulator
+Add `sim:=true` so teleop runs on the simulator's `/clock` (the same flag the rest of the stack uses):
+```bash
+ros2 launch teleop teleop.launch.py sim:=true
+ros2 run teleop keyboard_to_joy --ros-args -p use_sim_time:=true
+```
+
 ## Control Modes
 
 You must hold either the **LB** or **RB** buttons (or the equivalent keyboard toggles) to move the AUV.

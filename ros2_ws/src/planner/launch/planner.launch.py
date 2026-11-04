@@ -35,6 +35,7 @@ def generate_launch_description():
             {
                 "sim": LaunchConfiguration("sim"),
                 "use_ground_truth": LaunchConfiguration("use_ground_truth"),
+                "use_sim_time": LaunchConfiguration("sim"),
             }
         ],
     )

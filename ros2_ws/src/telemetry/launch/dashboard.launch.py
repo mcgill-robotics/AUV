@@ -65,6 +65,13 @@ def generate_launch_description():
         description='Prefix for the auto-started rosbag name'
     )
 
+    sim_arg = DeclareLaunchArgument(
+        'sim',
+        default_value='false',
+        description='true to run the telemetry nodes on simulation time (/clock)'
+    )
+    use_sim_time = {'use_sim_time': LaunchConfiguration('sim')}
+
     # Foxglove Bridge node
     foxglove_bridge = Node(
         package='foxglove_bridge',
@@ -83,7 +90,7 @@ def generate_launch_description():
                 '/zed/zed_node/rgb/color/rect/image/compressed',
                 '/zed/zed_node/depth/depth_registered/compressed'
             ],
-        }],
+        }, use_sim_time],
         output='screen'
     )
 
@@ -91,7 +98,8 @@ def generate_launch_description():
         package='telemetry',
         executable='drytest_foxglove',
         name='drytest_foxglove',
-        output='screen'
+        output='screen',
+        parameters=[use_sim_time]
     )
 
     vision_to_foxglove_node = Node(
@@ -99,14 +107,15 @@ def generate_launch_description():
         executable='vision_to_foxglove',
         name='vision_to_foxglove',
         output='screen',
-        parameters=[telemetry_config]
+        parameters=[telemetry_config, use_sim_time]
     )
 
     setpoint_to_foxglove_node = Node(
         package='telemetry',
         executable='setpoint_to_foxglove',
         name='setpoint_to_foxglove',
-        output='screen'
+        output='screen',
+        parameters=[use_sim_time]
     )
 
     rosbag_manager_node = Node(
@@ -118,10 +127,11 @@ def generate_launch_description():
             'profiles_file': LaunchConfiguration('rosbag_profiles_file'),
             'auto_start': LaunchConfiguration('auto_start_rosbag'),
             'recording_name_prefix': LaunchConfiguration('rosbag_prefix')
-        }]
+        }, use_sim_time]
     )
 
     return LaunchDescription([
+        sim_arg,
         port_arg,   
         address_arg,
         send_buffer_limit_arg,

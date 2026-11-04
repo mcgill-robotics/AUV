@@ -136,6 +136,7 @@ def generate_launch_description():
             IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(telemetry_launch_file),
                 launch_arguments={
+                    "sim": sim,
                     "auto_start_rosbag": auto_start_rosbag,
                     "rosbag_prefix": rosbag_prefix,
                 }.items(),
