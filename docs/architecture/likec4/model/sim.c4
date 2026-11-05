@@ -2,6 +2,7 @@
 model {
   extend sim.physics {
     thrusters = component 'Thrusters' {
+      link https://github.com/mcgill-robotics/auv-sim-unity/blob/main/Assets/_Project/Scripts/Actuators/Thrusters.cs 'Thrusters.cs'
       summary 'Eight forces in, eight forces applied to the rigidbody.'
       description '
         In: /propulsion/forces (ThrusterForces, newtons).
@@ -12,11 +13,13 @@ model {
       technology 'Actuators/Thrusters.cs'
     }
     buoyancy = component 'Buoyancy' {
+      link https://github.com/mcgill-robotics/auv-sim-unity/blob/main/Assets/_Project/Scripts/Physics/Buoyancy.cs 'Buoyancy.cs'
       summary 'Archimedes force at an offset centre, so the vehicle rights itself.'
       description 'Force scales with how much of the hull is submerged. Uses a bounding-box approximation.'
       technology 'Physics/Buoyancy.cs'
     }
     drag = component 'Drag' {
+      link https://github.com/mcgill-robotics/auv-sim-unity/blob/main/Assets/_Project/Scripts/Physics/Drag.cs 'Drag.cs'
       summary 'Fossen-style drag, added mass and cross-coupling.'
       description '
         Unity damping is turned off. Quadratic plus linear drag, angular drag,
@@ -44,6 +47,7 @@ model {
 
   extend sim.simsensors {
     sdvl = component 'DVL' {
+      link https://github.com/mcgill-robotics/auv-sim-unity/blob/main/Assets/_Project/Scripts/Sensors/DVLPublisher.cs 'DVLPublisher.cs'
       summary 'Four raycast beams with noise, bias and dropouts.'
       description '
         A50 model. Beams tilted 22.5 degrees, needs 3 of 4 valid. Gaussian noise (more horizontal than vertical),
@@ -53,11 +57,13 @@ model {
       technology 'Sensors/DVLPublisher.cs'
     }
     simu = component 'IMU' {
+      link https://github.com/mcgill-robotics/auv-sim-unity/blob/main/Assets/_Project/Scripts/Sensors/IMUPublisher.cs 'IMUPublisher.cs'
       summary 'MTi-600 style. White noise plus slowly drifting bias.'
       description 'Publishes imu/data. Orientation covariance is -1 (raw) unless AHRS-style noise is turned on.'
       technology 'Sensors/IMUPublisher.cs'
     }
     sdepth = component 'Depth sensor' {
+      link https://github.com/mcgill-robotics/auv-sim-unity/blob/main/Assets/_Project/Scripts/Sensors/DepthPublisher.cs 'DepthPublisher.cs'
       summary 'Depth is positive down (-Y position), plus noise and bias. Same as the real sensor.'
       technology 'Sensors/DepthPublisher.cs'
     }
@@ -67,6 +73,7 @@ model {
       technology 'Sensors/GroundTruth*.cs'
     }
     delay = component 'Sensor delay buffer' {
+      link https://github.com/mcgill-robotics/auv-sim-unity/blob/main/Assets/_Project/Scripts/Sensors/SensorDelayBuffer.cs 'SensorDelayBuffer.cs'
       summary 'Adds latency and the DVL ping interval, optionally random per reset.'
       technology 'Sensors/SensorDelayBuffer.cs'
     }
@@ -74,11 +81,13 @@ model {
 
   extend sim.camera {
     camPub = component 'CameraPublisher' {
+      link https://github.com/mcgill-robotics/auv-sim-unity/blob/main/Assets/_Project/Scripts/Sensors/CameraPublisher.cs 'CameraPublisher.cs'
       summary 'Reads the render back and publishes sensor_msgs/Image.'
       description 'Used for the down camera. The front camera uses the ZED path when ZED streaming is on.'
       technology 'Sensors/CameraPublisher.cs'
     }
     refraction = component 'Refraction shader' {
+      link https://github.com/mcgill-robotics/auv-sim-unity/blob/main/Assets/_Project/Shaders/UnderwaterRefraction.shader 'UnderwaterRefraction.shader'
       summary 'Bends the image the way a flat port does underwater.'
       description '
         Hidden/UnderwaterRefraction. Index 1.333, focal length, principal point and resolution
@@ -97,6 +106,7 @@ model {
       technology 'ZedNativeAPI'
     }
     depthCam = component 'Depth camera' {
+      link https://github.com/mcgill-robotics/auv-sim-unity/blob/main/Assets/_Project/Scripts/Sensors/CameraDepthPublisher.cs 'CameraDepthPublisher.cs'
       summary 'Metric depth from an HDRP custom pass. Published as 32FC1.'
       technology 'Sensors/CameraDepthPublisher.cs'
     }

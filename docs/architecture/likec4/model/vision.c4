@@ -2,6 +2,7 @@
 model {
   extend auv.vision {
     front = component 'front_cam_object_detection' {
+      link https://github.com/mcgill-robotics/AUV/blob/main/ros2_ws/src/vision/vision/object_detection/front_cam_object_detection_node.py 'front_cam_object_detection_node.py'
       summary 'Finds objects in the ZED image and gives each a 3D position.'
       description '
         Per frame, in order:
@@ -21,6 +22,7 @@ model {
       technology 'Python, RF-DETR, TensorRT'
     }
     down = component 'down_cam_object_detection' {
+      link https://github.com/mcgill-robotics/AUV/blob/main/ros2_ws/src/vision/vision/object_detection/down_cam_object_detection_node.py 'down_cam_object_detection_node.py'
       summary 'Finds objects on the floor and projects the pixel onto a plane.'
       description '''
         No depth sensor. Take the pixel (mask centroid), turn it into a ray (Snell), and stop it at a plane of known height.
@@ -32,11 +34,14 @@ model {
       technology 'Python, RF-DETR segmentation'
     }
     enhance = component 'image_enhancement' {
+      link https://github.com/mcgill-robotics/AUV/blob/main/ros2_ws/src/vision/vision/image_enhancement/image_enhancement_node.py 'image_enhancement_node.py'
       summary 'Optional clean-up before detection. Does nothing by default.'
       description 'Both entry points use an Identity enhancer. Dehazing, CLAHE and colour correction are written but not switched on. With the ZED SDK the front camera ignores this topic.'
       technology 'Python'
     }
     map = component 'object_map' {
+      link https://github.com/mcgill-robotics/AUV/blob/main/ros2_ws/src/vision/vision/object_map/object_map.cpp 'object_map.cpp'
+      link https://github.com/mcgill-robotics/AUV/blob/main/ros2_ws/src/vision/vision/object_map/object_tracker.cpp 'object_tracker.cpp'
       summary 'Moves detections into pool_link, runs the trackers, publishes the map.'
       description '
         Pose snapshot x camera transform puts each detection in pool_link.

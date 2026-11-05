@@ -21,6 +21,7 @@ model {
     summary 'The ROS 2 stack. Runs on the Jetson, or in the dev container next to the sim.'
 
     bringup = app 'bringup' {
+      link https://github.com/mcgill-robotics/AUV/blob/main/ros2_ws/src/bringup/launch/bringup.launch.py 'bringup.launch.py'
       summary 'One launch file, no nodes. Includes every other package.'
       description '
         Starts sensors, propulsion, controls, vision, telemetry and (optionally) the planner.
@@ -36,9 +37,11 @@ model {
     }
     tcp = app 'ros_tcp_endpoint' {
       #sim
+      link https://github.com/Unity-Technologies/ROS-TCP-Endpoint 'ROS-TCP-Endpoint'
       summary 'TCP bridge to Unity, port 10000.'
     }
     sensors = app 'sensors' {
+      link https://github.com/mcgill-robotics/AUV/tree/main/ros2_ws/src/sensors 'ros2_ws/src/sensors'
       summary 'Raw sensors in, one fused pose out.'
       description '''
         Every sensor is converted into the AUV frame once, then fused into `state/pose`.
@@ -47,21 +50,27 @@ model {
       '''
     }
     controls = app 'controls' {
+      link https://github.com/mcgill-robotics/AUV/tree/main/ros2_ws/src/controls 'ros2_ws/src/controls'
       summary 'A goal in, one total wrench out. The controllers start disabled; the planner turns them on.'
     }
     propulsion = app 'propulsion' {
+      link https://github.com/mcgill-robotics/AUV/tree/main/ros2_ws/src/propulsion 'ros2_ws/src/propulsion'
       summary 'Wrench to eight thruster forces to PWM.'
     }
     teleop = app 'teleop' {
+      link https://github.com/mcgill-robotics/AUV/tree/main/ros2_ws/src/teleop 'ros2_ws/src/teleop'
       summary 'Gamepad or keyboard to wrench.'
     }
     planner = app 'planner' {
+      link https://github.com/mcgill-robotics/AUV/tree/main/ros2_ws/src/planner 'ros2_ws/src/planner'
       summary 'Behaviour tree that runs the competition tasks.'
     }
     vision = app 'vision' {
+      link https://github.com/mcgill-robotics/AUV/tree/main/ros2_ws/src/vision 'ros2_ws/src/vision'
       summary 'Camera images in, a persistent 3D map of the course out.'
     }
     telemetry = app 'telemetry' {
+      link https://github.com/mcgill-robotics/AUV/tree/main/ros2_ws/src/telemetry 'ros2_ws/src/telemetry'
       summary 'Foxglove bridge, scene markers, rosbag recording.'
     }
     models = store 'Model packages' {
@@ -111,15 +120,19 @@ model {
       summary 'Raw imports and the train/val/test splits.'
     }
     organize = app 'organize_dataset' {
+      link https://github.com/mcgill-robotics/AUV/blob/main/ros2_ws/src/vision/model_pipeline/organize_dataset.py 'organize_dataset.py'
       summary 'Splits 70/20/10. YOLO or COCO. Optional letterbox to 512.'
     }
     augment = app 'augment_dataset' {
+      link https://github.com/mcgill-robotics/AUV/blob/main/ros2_ws/src/vision/model_pipeline/augment_dataset.py 'augment_dataset.py'
       summary 'Albumentations on the train split only. Synthetic data only.'
     }
     train = app 'training' {
+      link https://github.com/mcgill-robotics/AUV/blob/main/ros2_ws/src/vision/model_pipeline/training.py 'training.py'
       summary 'YOLO or RF-DETR. Can fine-tune from a checkpoint.'
     }
     export = app 'export and engine build' {
+      link https://github.com/mcgill-robotics/AUV/blob/main/ros2_ws/src/vision/models/export_rfdetr.py 'export_rfdetr.py'
       summary 'ONNX export, then trtexec on the Jetson.'
     }
     prelabel = app 'Pre-labelling tools' {

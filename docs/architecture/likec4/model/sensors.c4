@@ -2,6 +2,7 @@
 model {
   extend auv.sensors {
     imuProc = component 'imu_processor' {
+      link https://github.com/mcgill-robotics/AUV/blob/main/ros2_ws/src/sensors/src/Imu_processor.cpp 'Imu_processor.cpp'
       summary 'Rotates the IMU into the AUV frame. Fixes yaw drift with the DVL.'
       description '
         In: imu/data (Imu), dvl/dead_reckoning (DVLDR).
@@ -11,6 +12,7 @@ model {
       technology 'C++'
     }
     depthProc = component 'depth_processor' {
+      link https://github.com/mcgill-robotics/AUV/blob/main/ros2_ws/src/sensors/src/depth_processor.cpp 'depth_processor.cpp'
       summary 'Depth sensor to AUV depth, with lever-arm correction.'
       description '
         In: /sensors/depth/z (Float64), auv_frame/imu.
@@ -21,6 +23,7 @@ model {
       technology 'C++'
     }
     dvlProc = component 'dvl_processor' {
+      link https://github.com/mcgill-robotics/AUV/blob/main/ros2_ws/src/sensors/src/dvl_processor.cpp 'dvl_processor.cpp'
       summary 'Rotates DVL velocity and position into the AUV frame.'
       description '
         In: dvl/velocity, dvl/dead_reckoning, auv_frame/imu.
@@ -30,6 +33,7 @@ model {
       technology 'C++'
     }
     stateAgg = component 'state_aggregator' {
+      link https://github.com/mcgill-robotics/AUV/blob/main/ros2_ws/src/sensors/src/State_aggregator.cpp 'State_aggregator.cpp'
       summary 'Fuses everything into one pose, state/pose, at 50 Hz.'
       description '
         In: auv_frame/imu, auv_frame/depth, auv_frame/dvl/*.
@@ -40,6 +44,9 @@ model {
       technology 'C++'
     }
     health = component 'health monitors' {
+      link https://github.com/mcgill-robotics/AUV/blob/main/ros2_ws/src/sensors/sensors/health_monitor.py 'health_monitor.py'
+      link https://github.com/mcgill-robotics/AUV/blob/main/ros2_ws/src/sensors/sensors/imu_monitor.py 'imu_monitor.py'
+      link https://github.com/mcgill-robotics/AUV/blob/main/ros2_ws/src/sensors/sensors/dvl_monitor.py 'dvl_monitor.py'
       summary 'Watch IMU and DVL rates and publish /diagnostics. Separate launch: sensor_health.launch.py.'
       technology 'Python'
     }

@@ -2,6 +2,7 @@
 model {
   extend auv.planner {
     tree = component 'Behaviour tree' {
+      link https://github.com/mcgill-robotics/AUV/blob/main/ros2_ws/src/planner/planner/root_tree.py 'root_tree.py'
       summary 'py_trees root tree, ticked 3 times a second. Waits for a mission number, then 30 s, then runs it.'
       description '''
         The tree calls ("ticks") the running task 3 times a second. Each tick the task answers: still running, succeeded, or failed.
@@ -15,6 +16,7 @@ model {
       technology 'py_trees_ros'
     }
     tasks = component 'Mission tasks' {
+      link https://github.com/mcgill-robotics/AUV/tree/main/ros2_ws/src/planner/planner/missions 'missions/'
       summary 'Gate, slalom, bins, torpedo, table and octagon, return home.'
       description '
         Each task is a set of behaviours. Most of them wrap an AUVNavigate goal and read the object map.
@@ -24,6 +26,7 @@ model {
       '
     }
     board = component 'Blackboard feeds' {
+      link https://github.com/mcgill-robotics/AUV/blob/main/ros2_ws/src/planner/planner/missions/mission_behaviour_components.py 'mission_behaviour_components.py'
       summary 'Subscribes to pose, twist, object map and down-cam detections.'
       description '
         state/pose, auv_frame/dvl/velocity, /dvl/velocity, /vision/object_map, /vision/down_cam/detection_frame.

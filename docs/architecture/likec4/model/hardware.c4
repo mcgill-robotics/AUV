@@ -15,6 +15,7 @@ model {
       summary 'Velocity over the floor and a dead-reckoned position. Overheats out of the water.'
     }
     pressure = device 'Pressure sensor' {
+      link https://github.com/mcgill-robotics/auv-embedded-2026 'auv-embedded-2026'
       summary 'Depth. Read by firmware on an embedded board, not by a ROS driver.'
       description 'Firmware lives in the auv-embedded-2026 repository. It reaches ROS through micro_ros_agent.'
     }
@@ -25,22 +26,26 @@ model {
       summary 'USB camera, /dev/down_cam. Read directly by the vision node.'
     }
     actuators = device 'Actuator board, ESCs and thrusters' {
+      link https://github.com/mcgill-robotics/auv-embedded-2026 'auv-embedded-2026'
       summary 'Receives eight PWM values over micro-ROS. Also the grabber and torpedoes.'
     }
     power = device 'Power board' {
+      link https://github.com/mcgill-robotics/auv-embedded-2026 'auv-embedded-2026'
       summary 'Battery monitor and kill signal.'
     }
   }
 
   extend auv.drivers {
     xsens = component 'Xsens driver' {
+      link https://github.com/mcgill-robotics/AUV/tree/main/ros2_ws/src/Xsens_MTi_Driver 'Xsens_MTi_Driver'
       summary 'Publishes imu/data.'
     }
     dvlDrv = component 'DVL serial driver' {
-      summary 'Publishes dvl/velocity and dvl/dead_reckoning. Started only if dvl:=true.'
       link https://github.com/mcgill-robotics/AUV/tree/main/ros2_ws/src/dvl_a50_serial_python 'dvl_a50_serial_python'
+      summary 'Publishes dvl/velocity and dvl/dead_reckoning. Started only if dvl:=true.'
     }
     microros = component 'micro-ROS agents' {
+      link https://github.com/micro-ROS/micro-ROS-Agent 'micro_ros_agent'
       summary 'Bridge between ROS topics and the firmware on the embedded boards.'
       description '
         Three agents, one per serial device: /dev/display and /dev/actuator are started by the sensors launch,

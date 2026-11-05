@@ -2,23 +2,28 @@
 model {
   extend auv.telemetry {
     bridge = component 'foxglove_bridge' {
+      link https://github.com/foxglove/ros-foxglove-bridge 'foxglove_bridge'
       summary 'WebSocket on port 8765 for Foxglove Studio.'
       technology 'foxglove_bridge'
     }
     v2f = component 'vision_to_foxglove' {
+      link https://github.com/mcgill-robotics/AUV/blob/main/ros2_ws/src/telemetry/telemetry/vision_to_foxglove.py 'vision_to_foxglove.py'
       summary 'Object map and detections as 3D scene markers.'
       technology 'Python'
     }
     s2f = component 'setpoint_to_foxglove' {
+      link https://github.com/mcgill-robotics/AUV/blob/main/ros2_ws/src/telemetry/telemetry/setpoint_to_foxglove.py 'setpoint_to_foxglove.py'
       summary 'The four setpoints as one pose marker.'
       technology 'Python'
     }
     rosbagMgr = component 'rosbag_manager' {
+      link https://github.com/mcgill-robotics/AUV/blob/main/ros2_ws/src/telemetry/telemetry/rosbag_manager_node.py 'rosbag_manager_node.py'
       summary 'Record and play, with named profiles.'
       description 'Service /rosbag_manager/control. Profiles live in rosbag_profiles.yaml (all, vision, nav_and_controls, ...). Can auto-start with auto_start_rosbag.'
       technology 'Python'
     }
     dry = component 'drytest_foxglove' {
+      link https://github.com/mcgill-robotics/AUV/blob/main/ros2_ws/src/telemetry/telemetry/drytest_foxglove.py 'drytest_foxglove.py'
       summary 'Thruster bench-test services.'
       technology 'Python'
     }
