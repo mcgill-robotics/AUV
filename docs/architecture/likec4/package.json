@@ -3,6 +3,11 @@
   "private": true,
   "description": "Architecture diagrams for the AUV stack, written in LikeC4",
   "scripts": {
+    "postinstall": "node scripts/patch-search.mjs",
+    "sync": "node scripts/patch-search.mjs",
+    "prestart": "npm run sync",
+    "prevalidate": "npm run sync",
+    "prebuild": "npm run sync",
     "start": "likec4 start --public public",
     "validate": "likec4 validate",
     "build": "likec4 build -o dist --public public",
