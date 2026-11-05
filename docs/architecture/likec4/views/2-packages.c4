@@ -1,0 +1,58 @@
+// One zoom view per package that has real structure. A package shows its own
+// parts expanded and everything it talks to as the real package, collapsed.
+// Each view only shows the arrows that belong to its story.
+views {
+  view sensorsDeep of auv.sensors {
+    title '4. sensors: raw readings to one pose'
+    description 'IMU, DVL and depth are each converted into the AUV frame, then fused into state/pose. The planner and vision also read state/pose (view 10).'
+    autoLayout LeftRight
+    include auv.sensors.*
+    include auv.drivers, auv.controls
+  }
+
+  view controlsDeep of auv.controls {
+    title '5. controls, propulsion and teleop: a goal to thruster PWM'
+    description '''
+      Read left to right: goal, setpoints, one effort per controller, one wrench, eight thrusters. Each controller reads its own sensor topic in the vehicle frame (auv_frame/...); navigation_server reads state/pose to know when you arrived. Teleop skips the controllers. The planner also turns all four controllers on at start (they start disabled). Legend and words: view 1.
+
+      ![PID with feed-forward, worked through for depth](img/pid-loop.svg)
+    '''
+    autoLayout LeftRight
+    include auv.controls.*, auv.propulsion.*, auv.teleop.*
+    include auv.controls.nav with {
+      navigateTo navFlow
+    }
+    include auv.controls.superimposer with {
+      navigateTo thrustFlow
+    }
+    include auv.propulsion.mapper with {
+      navigateTo thrustFlow
+    }
+    include auv.sensors, auv.planner, auv.drivers
+    exclude auv.propulsion.killer
+    exclude auv.controls.nav -> auv.planner
+    exclude auv.drivers -> auv.sensors, auv.sensors -> auv.planner, auv.planner -> auv.drivers
+  }
+
+  view visionDeep of auv.vision {
+    title '6. vision: pixels to a map'
+    description 'Two cameras are detected, located in 3D, tracked and merged into one persistent map. The down camera also sends its detections straight to the planner, for tasks that look down.'
+    include auv.vision.*
+    include zed, hw.downCam, auv.models, auv.sensors, auv.planner
+    exclude auv.sensors -> auv.planner
+    exclude auv.planner -> auv.vision.down
+  }
+
+  view plannerDeep of auv.planner {
+    title '7. planner: reading the world, sending goals'
+    description '''
+      The tree ticks the running task 3 times a second. Tasks read the latest messages from the blackboard and send navigate goals. At start, the tree enables the controllers.
+
+      ![The mission tree](img/mission-tree.svg)
+    '''
+    autoLayout LeftRight
+    include auv.planner.*, auv.planner.tasks.*
+    include auv.sensors, auv.vision, auv.controls, auv.drivers
+    exclude auv.sensors -> auv.controls, auv.drivers -> auv.sensors, auv.controls -> auv.planner
+  }
+}

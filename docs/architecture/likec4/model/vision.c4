@@ -1,0 +1,63 @@
+// vision: image -> detection with a 3D position -> tracked map in pool_link.
+model {
+  extend auv.vision {
+    front = component 'front_cam_object_detection' {
+      link https://github.com/mcgill-robotics/AUV/blob/main/ros2_ws/src/vision/vision/object_detection/front_cam_object_detection_node.py 'front_cam_object_detection_node.py'
+      summary 'Finds objects in the ZED image and gives each a 3D position.'
+      description '
+        Per frame, in order:
+        1. Snapshot one AUV pose, so image and pose cannot drift apart.
+        2. RF-DETR inference, threshold 0.60.
+        3. Border filter on pipes, gate and bin. Gate box cropped to its top half.
+        4. Pick a depth method per label (see below).
+        5. Undo the flat-port bending, in two parts: scale the depth (1.4 in the centre, more toward the left and right edges; depth-map and zed_3d methods only), then fix x and y with Snell (index 1.333, the param is named lateral_scale). known_height uses Snell on the box height instead, and the plane methods only need the x, y fix.
+        6. Build a covariance. Publish the frame with the pose attached.
+
+        Depth methods, set per label in vision_pipeline.yaml:
+        depth_map_median, depth_map_nearest (10th percentile), zed_3d (bin),
+        known_height (pinhole), ray to the surface or floor (octagon).
+        Stereo depth is noisy on thin or featureless things like pipes and the gate,
+        so those use nearest-percentile or geometry instead.
+      '
+      technology 'Python, RF-DETR, TensorRT'
+    }
+    down = component 'down_cam_object_detection' {
+      link https://github.com/mcgill-robotics/AUV/blob/main/ros2_ws/src/vision/vision/object_detection/down_cam_object_detection_node.py 'down_cam_object_detection_node.py'
+      summary 'Finds objects on the floor and projects the pixel onto a plane.'
+      description '''
+        No depth sensor. Take the pixel (mask centroid), turn it into a ray (Snell), and stop it at a plane of known height.
+        The planner can change the heights at runtime once the DVL has measured the table.
+        Yaw comes from the largest contour (`minAreaRect`).
+
+        ![Down camera: the ray stops at a plane of known height](img/downcam-projection.svg)
+      '''
+      technology 'Python, RF-DETR segmentation'
+    }
+    enhance = component 'image_enhancement' {
+      link https://github.com/mcgill-robotics/AUV/blob/main/ros2_ws/src/vision/vision/image_enhancement/image_enhancement_node.py 'image_enhancement_node.py'
+      summary 'Optional clean-up before detection. Does nothing by default.'
+      description 'Both entry points use an Identity enhancer. Dehazing, CLAHE and colour correction are written but not switched on. With the ZED SDK the front camera ignores this topic.'
+      technology 'Python'
+    }
+    map = component 'object_map' {
+      link https://github.com/mcgill-robotics/AUV/blob/main/ros2_ws/src/vision/vision/object_map/object_map.cpp 'object_map.cpp'
+      link https://github.com/mcgill-robotics/AUV/blob/main/ros2_ws/src/vision/vision/object_map/object_tracker.cpp 'object_tracker.cpp'
+      summary 'Moves detections into pool_link, runs the trackers, publishes the map.'
+      description '
+        Pose snapshot x camera transform puts each detection in pool_link.
+        Pipes beyond 7 m are dropped, and detections outside the lane boundary.
+        Unique objects, the one-per-course objects (gate and both panels, table and its items, octagon, board and its icons, bin_structure; unique_objects in vision_pipeline.yaml), are kept forever once confirmed.
+        Pipes, bins and lane markers appear only while their track is confirmed.
+        Gate: the two role panels pull the gate to their midpoint and set its facing direction.
+        Service ~/clear empties the map.
+      '
+      technology 'C++'
+    }
+  }
+
+  auv.models -> auv.vision.front.infer 'ONNX model or TensorRT engine'
+  auv.models -> auv.vision.down 'ONNX model or TensorRT engine'
+  auv.vision.enhance -> auv.vision.front 'image_enhanced (off by default)'
+  auv.vision.enhance -> auv.vision.down 'image_enhanced (off by default)'
+  auv.vision.down -> auv.planner.board 'down_cam/detection_frame'
+}

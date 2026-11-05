@@ -1,0 +1,46 @@
+// planner: reads the world through the blackboard, acts by sending navigate goals.
+model {
+  extend auv.planner {
+    tree = component 'Behaviour tree' {
+      link https://github.com/mcgill-robotics/AUV/blob/main/ros2_ws/src/planner/planner/root_tree.py 'root_tree.py'
+      summary 'py_trees root tree, ticked 3 times a second. Waits for a mission number, then 30 s, then runs it.'
+      description '''
+        The tree calls ("ticks") the running task 3 times a second. Each tick the task answers: still running, succeeded, or failed.
+        `root_tree.py` builds the mission from `behaviour_tree_params.yaml`.
+
+        It waits for a mission number on `/mission_selector`, waits `startup_delay` (30 s), then **enables the four controllers**:
+        on the real vehicle they start with `enabled: false`. The mission is recorded to a rosbag by default.
+
+        ![The mission tree](img/mission-tree.svg)
+      '''
+      technology 'py_trees_ros'
+    }
+    tasks = component 'Mission tasks' {
+      link https://github.com/mcgill-robotics/AUV/tree/main/ros2_ws/src/planner/planner/missions 'missions/'
+      summary 'Gate, slalom, bins, torpedo, table and octagon, return home.'
+      description '
+        Each task is a set of behaviours. Most of them wrap an AUVNavigate goal and read the object map.
+        Pre-qual and debug missions live next to them.
+        Gate: picks the nearest gate and the nearest role panel, then flies approach and pass points along the gate direction.
+        Search sweep: turns 360 degrees until the target label shows up.
+      '
+    }
+    board = component 'Blackboard feeds' {
+      link https://github.com/mcgill-robotics/AUV/blob/main/ros2_ws/src/planner/planner/missions/mission_behaviour_components.py 'mission_behaviour_components.py'
+      summary 'Subscribes to pose, twist, object map and down-cam detections.'
+      description '
+        state/pose, auv_frame/dvl/velocity, /dvl/velocity, /vision/object_map, /vision/down_cam/detection_frame.
+        In sim with use_ground_truth, pose and twist come from /auv/ground_truth/* instead.
+        Behaviours only read from here, which keeps them easy to test.
+        Nothing checks message age. Staleness is judged by frames_since_last_seen on each object, which freezes for remembered objects (see object_map).
+      '
+    }
+  }
+
+  auv.planner.board -> auv.planner.tasks 'read by behaviours'
+  auv.planner.tree -> auv.planner.tasks 'ticks'
+  auv.sensors.stateAgg.poseOut -> auv.planner.board 'state/pose'
+  auv.sensors.dvlProc -> auv.planner.board 'auv_frame/dvl/velocity'
+  auv.planner.tree -[call]-> auv.telemetry.rosbagMgr 'start and stop recording'
+  auv.planner.tree -[call]-> auv.controls 'enable the controllers at start (set_parameters)'
+}

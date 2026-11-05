@@ -1,0 +1,35 @@
+views {
+  view simOverview of sim {
+    title '11. Unity simulator: standing in for the vehicle'
+    description 'Unity plays the pool, the vehicle and its sensors. It speaks the same ROS topics, through ros_tcp_endpoint, so the AUV software runs unchanged. The synthetic data side is view 13.'
+    autoLayout LeftRight
+    include sim.reset, sim.physics, sim.simsensors, sim.camera, sim.scoring
+    include auv.tcp, zed
+  }
+
+  view simInside {
+    title '12. Inside the simulator: what it fakes'
+    description '''
+      Forces in, motion out, then noisy sensor readings. Noise, bias and delay are added on purpose: perfect sensors would hide bugs that show up on the real vehicle.
+
+      ![The sim loop](img/sim-loop.svg)
+    '''
+    autoLayout LeftRight
+    include sim.physics.*, sim.simsensors.*, sim.camera.*
+    include auv.tcp, zed
+    exclude zed -> *
+    include sim.camera.zedSender -> zed
+  }
+
+  view synthTraining {
+    title '13. Synthetic data and training: images to a model'
+    description '''
+      Unity makes labelled images, the pipeline trains a detector, the Jetson compiles it. Class names must match in four places: Unity labels, classes.yaml, class_names.txt, vision_pipeline.yaml.
+
+      ![Synthetic data, step by step](img/synth-data.svg)
+    '''
+    autoLayout TopBottom
+    include sim.synth.*, sim.solo, sim.converter
+    include training.*, roboflow, auv.models, auv.vision.front
+  }
+}
