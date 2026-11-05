@@ -6,6 +6,7 @@
 
 #define quaternion_topic "/controls/quaternion_setpoint"
 
+// Test fixture for AttitudeController
 class AttitudeControllerTest : public ::testing::Test 
 {
     protected:
