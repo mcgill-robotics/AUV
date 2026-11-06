@@ -6,6 +6,8 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.actions import DeclareLaunchArgument
 from launch.conditions import IfCondition
 from launch.substitutions import LaunchConfiguration
+from launch_ros.actions import Node
+from launch_ros.parameter_descriptions import ParameterValue
 
 def generate_launch_description():
     sim_condition = DeclareLaunchArgument(
@@ -28,6 +30,18 @@ def generate_launch_description():
         description="Enable object detection inference in the vision pipeline globally",
     )
     
+    zed_stream_ip_arg = DeclareLaunchArgument(
+        "zed_stream_ip",
+        default_value="127.0.1.1",
+        description="IP of the ZED stream used by vision in sim mode (the simulator's ZED stream)",
+    )
+
+    tcp_client_timeout_arg = DeclareLaunchArgument(
+        "tcp_client_timeout",
+        default_value="10.0",
+        description="ROS-TCP endpoint: seconds of silence from Unity before its connection is dropped (0 = never)",
+    )
+
     controls_condition = DeclareLaunchArgument(
         "controls",
         default_value="true",
@@ -85,7 +99,6 @@ def generate_launch_description():
     controls_pkg_path = get_package_share_directory("controls")
     vision_pkg_path = get_package_share_directory("vision")
     planner_pkg_path = get_package_share_directory("planner")
-    ros_tcp_endpoint_pkg_path = get_package_share_directory("ros_tcp_endpoint")
     telemetry_pkg_path = get_package_share_directory("telemetry")
 
     sensors_launch_file = os.path.join(sensors_pkg_path, "launch", "sensors.launch.py")
@@ -93,7 +106,6 @@ def generate_launch_description():
     controls_launch_file = os.path.join(controls_pkg_path, "launch", "controls.launch.py")
     vision_launch_file = os.path.join(vision_pkg_path, "launch", "vision_pipeline.launch.py")
     planner_launch_file = os.path.join(planner_pkg_path, "launch", "planner.launch.py")
-    ros_tcp_endpoint_launch_file = os.path.join(ros_tcp_endpoint_pkg_path, "launch", "endpoint.py")
     telemetry_launch_file = os.path.join(telemetry_pkg_path, "launch", "dashboard.launch.py")
 
     launch_sensors = GroupAction(
@@ -136,6 +148,7 @@ def generate_launch_description():
             IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(telemetry_launch_file),
                 launch_arguments={
+                    "sim": sim,
                     "auto_start_rosbag": auto_start_rosbag,
                     "rosbag_prefix": rosbag_prefix,
                 }.items(),
@@ -150,7 +163,8 @@ def generate_launch_description():
                 PythonLaunchDescriptionSource(vision_launch_file),
                 launch_arguments={
                     "sim": sim,
-                    "enable_object_detection": enable_object_detection
+                    "enable_object_detection": enable_object_detection,
+                    "zed_stream_ip": LaunchConfiguration("zed_stream_ip"),
                 }.items(),
             )
         ],
@@ -170,8 +184,19 @@ def generate_launch_description():
     sim_group = GroupAction(
         condition=IfCondition(sim),
         actions=[
-            IncludeLaunchDescription(
-                PythonLaunchDescriptionSource(ros_tcp_endpoint_launch_file)
+            # Same node as ros_tcp_endpoint's endpoint.py, started here so the
+            # client timeout can be set from the command line.
+            Node(
+                package="ros_tcp_endpoint",
+                executable="default_server_endpoint",
+                emulate_tty=True,
+                parameters=[{
+                    "ROS_IP": "0.0.0.0",
+                    "ROS_TCP_PORT": 10000,
+                    "TCP_CLIENT_TIMEOUT": ParameterValue(
+                        LaunchConfiguration("tcp_client_timeout"), value_type=float
+                    ),
+                }],
             )
         ],
     )
@@ -196,6 +221,8 @@ def generate_launch_description():
         sim_condition,
         vision_condition,
         enable_object_detection_arg,
+        zed_stream_ip_arg,
+        tcp_client_timeout_arg,
         controls_condition,
         sensors_condition,
         propulsion_condition,

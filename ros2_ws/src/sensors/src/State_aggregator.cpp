@@ -16,11 +16,13 @@ namespace sensors
         this->declare_parameter<bool>("publish_pose_tf", true);
         this->declare_parameter<bool>("use_vio_for_position", false);
         this->declare_parameter<bool>("use_vio_for_orientation", false);
+        this->declare_parameter<std::string>("vio_pose_topic", "/vision/vio_pose");
         this->get_parameter("frame_id_auv", frame_id_auv_);
         this->get_parameter("frame_id_global", frame_id_global_);
         this->get_parameter("publish_pose_tf", publish_pose_tf_);
         this->get_parameter("use_vio_for_position", use_vio_for_position_);
         this->get_parameter("use_vio_for_orientation", use_vio_for_orientation_);
+        const std::string vio_pose_topic = this->get_parameter("vio_pose_topic").as_string();
 
         imu_sub_ = this->create_subscription<imu_msg>(
             "auv_frame/imu",
@@ -46,14 +48,16 @@ namespace sensors
         );
 
         vio_pose_sub_ = this->create_subscription<geometry_msgs::msg::PoseStamped>(
-            "front_cam/vio/pose",
+            vio_pose_topic,
             rclcpp::SensorDataQoS().keep_last(1),
             std::bind(&State_aggregator::vio_pose_callback, this, std::placeholders::_1)
         );
 
+        // Reliable so that reliable-only subscribers (e.g. the simulator's ROS-TCP
+        // endpoint) receive it. Best-effort subscribers still match a reliable publisher.
         pose_pub_ = this->create_publisher<geometry_msgs::msg::PoseStamped>(
             "state/pose",
-            rclcpp::SensorDataQoS().keep_last(1)
+            rclcpp::QoS(rclcpp::KeepLast(1)).reliable().durability_volatile()
         );
         tf_broadcaster_ = std::make_unique<tf2_ros::TransformBroadcaster>(*this);
 

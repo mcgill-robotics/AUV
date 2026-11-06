@@ -26,7 +26,7 @@ def generate_launch_description():
         package="controls",
         executable="planar_controller.py",
         output="screen",
-        parameters=[sim_yaml],
+        parameters=[sim_yaml, {"use_sim_time": True}],
         condition=IfCondition(sim),
     )
 
