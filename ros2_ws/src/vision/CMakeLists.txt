@@ -105,6 +105,7 @@ if(CMAKE_CUDA_COMPILER AND TensorRT_FOUND)
   find_package(cv_bridge REQUIRED)
   find_package(ament_index_cpp REQUIRED)
   find_package(ZED 5 QUIET)
+  find_package(CUDAToolkit REQUIRED)  # CUDA::cudart; rf-detr-cpp's own find is scoped to its subdirectory
 
   add_executable(front_cam_object_detection
       ${PROJECT_NAME}/front_cam_object_detection_main.cpp
