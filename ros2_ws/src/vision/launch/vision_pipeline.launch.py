@@ -1,7 +1,7 @@
 import os
 import yaml
 
-from ament_index_python.packages import get_package_share_directory
+from ament_index_python.packages import get_package_prefix, get_package_share_directory
 
 from launch import LaunchDescription
 from launch.actions import IncludeLaunchDescription, DeclareLaunchArgument,TimerAction
@@ -145,9 +145,16 @@ def generate_launch_description():
         str(default_config["down_cam_object_detection"]["ros__parameters"]["enable_object_detection"]).lower(), "' == 'true' else 'false'"
     ])
     
+    # The C++ node is only built on machines with CUDA + TensorRT (Jetson / NVIDIA images).
+    # Elsewhere (e.g. CPU-only dev containers) fall back to the Python node.
+    cpp_front_detector = os.path.join(get_package_prefix("vision"), "lib", "vision", "front_cam_object_detection")
+    front_detection_executable = (
+        "front_cam_object_detection" if os.path.exists(cpp_front_detector) else "front_cam_object_detection.py"
+    )
+
     front_detection_node = Node(
         package='vision',
-        executable='front_cam_object_detection.py',
+        executable=front_detection_executable,
         name='front_cam_object_detection',
         parameters=[
             config_path,
