@@ -682,6 +682,8 @@ void FrontCamObjectDetectionNode::grab_loop() {
         if (result != sl::ERROR_CODE::SUCCESS) {
             RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), kWarnThrottleMs, "Zed.grab() failed: %s",
                                  zed_error(result).c_str());
+            // Don't spin a core at 100% while the camera is unplugged or restarting.
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
             continue;
         }
 
@@ -757,7 +759,7 @@ std::optional<geometry_msgs::msg::PoseStamped> FrontCamObjectDetectionNode::vio_
 
     // The pressure sensor overrides VIO Z.
     const auto translation = cam_pose.getTranslation();
-    const auto rotation = cam_pose.getRotationMatrix();
+    auto rotation = cam_pose.getRotationMatrix();  // sl::Matrix3f::operator() is non-const
     Eigen::Matrix4d T_world_detection = Eigen::Matrix4d::Identity();
     for (int r = 0; r < 3; ++r) {
         for (int c = 0; c < 3; ++c) {

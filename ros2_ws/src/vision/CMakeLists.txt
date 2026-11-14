@@ -5,7 +5,8 @@ project(vision)
 set(CMAKE_CXX_STANDARD 17)
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-  add_compile_options(-Wall -Wextra -Wpedantic)
+  # C++ only: nvcc forwards these to its generated host code and -Wpedantic floods the log.
+  add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-Wall> $<$<COMPILE_LANGUAGE:CXX>:-Wextra> $<$<COMPILE_LANGUAGE:CXX>:-Wpedantic>)
 endif()
 
 find_package(ament_cmake REQUIRED)
@@ -88,6 +89,9 @@ if(CMAKE_CUDA_COMPILER AND TensorRT_FOUND)
   set(RFDETR_BUILD_APPS ON CACHE BOOL "" FORCE)  # rfdetr_build compiles ONNX -> engine on the target GPU
   add_subdirectory(external/rf-detr-cpp EXCLUDE_FROM_ALL)
   add_custom_target(vision_rfdetr_tools ALL DEPENDS rfdetr_build)
+  # Third-party code: silence its warnings (deprecated TensorRT 10 APIs etc.) so ours stay visible.
+  target_compile_options(rfdetr PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-w>)
+  target_compile_options(rfdetr_build PRIVATE -w)
 
   add_library(rfdetr_engine_lib SHARED
       ${PROJECT_NAME}/object_detection/rfdetr_engine.cpp
@@ -119,7 +123,7 @@ if(CMAKE_CUDA_COMPILER AND TensorRT_FOUND)
   ament_target_dependencies(front_cam_object_detection ${ROS_DEPS} ${CPP_LIBS} cv_bridge ament_index_cpp)
   if(ZED_FOUND)
     target_compile_definitions(front_cam_object_detection PRIVATE ZED_SDK_AVAILABLE)
-    target_include_directories(front_cam_object_detection PRIVATE ${ZED_INCLUDE_DIRS})
+    target_include_directories(front_cam_object_detection SYSTEM PRIVATE ${ZED_INCLUDE_DIRS})
     target_link_directories(front_cam_object_detection PRIVATE ${ZED_LIBRARY_DIR})
     target_link_libraries(front_cam_object_detection ${ZED_LIBRARIES} CUDA::cudart)
     message(STATUS "vision: front_cam_object_detection built with ZED SDK ${ZED_VERSION}")
