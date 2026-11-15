@@ -33,7 +33,7 @@ def generate_launch_description():
     ])
 
     default_nav2_planning = PathJoinSubstitution([
-        FindPackageShare("controls"), "launch", "path_planner.launch.py"
+        FindPackageShare("controls"), "launch", "nav2.launch.py"
     ])
 
     declare_attitude = DeclareLaunchArgument(

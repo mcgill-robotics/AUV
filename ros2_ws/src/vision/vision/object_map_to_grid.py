@@ -1,13 +1,12 @@
 #!/usr/bin/env python3
 
 import math
-
 import rclpy
 from auv_msgs.msg import VisionObjectArray
 from nav_msgs.msg import OccupancyGrid
 from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
-from controls.controls.utils import yaw_from_quaternion
+from controls.utils import yaw_from_quaternion
 
 
 class ObjectMapToGrid(Node):
@@ -43,7 +42,7 @@ class ObjectMapToGrid(Node):
         }
 
         if self.resolution <= 0.0 or self.x_max <= self.x_min or self.y_max <= self.y_min:
-            raise ValueError("Map bounds and resolution must define a positive grid")
+            raise ValueError("fix your map bounds bro, they dont make sense")
         self.width = math.ceil((self.x_max - self.x_min) / self.resolution)
         self.height = math.ceil((self.y_max - self.y_min) / self.resolution)
 
@@ -65,8 +64,10 @@ class ObjectMapToGrid(Node):
             f"({self.width}x{self.height} cells at {self.resolution:.2f} m)"
         )
 
+    # Occupancy grid represents how likely each cell is to be occupied
+    # 0 means guaranteed free, 100 means guaranteed occupied, -1 means unknown
+    # Values between 0 and 100 represent varying levels of certainty about occupancy
     def object_map_callback(self, object_map):
-        time_start = self.get_clock().now()
         grid = OccupancyGrid()
         grid.header.stamp = object_map.header.stamp
         grid.header.frame_id = object_map.header.frame_id or "pool_link"
@@ -76,6 +77,10 @@ class ObjectMapToGrid(Node):
         grid.info.height = self.height
         grid.info.origin.position.x = self.x_min
         grid.info.origin.position.y = self.y_min
+        grid.info.origin.position.z = 0.0
+        grid.info.origin.orientation.x = 0.0
+        grid.info.origin.orientation.y = 0.0
+        grid.info.origin.orientation.z = 0.0
         grid.info.origin.orientation.w = 1.0
         grid.data = [0] * (self.width * self.height)
 
@@ -94,10 +99,12 @@ class ObjectMapToGrid(Node):
             cosine = math.cos(yaw)
             sine = math.sin(yaw)
 
-            # Expand sub-cell footprints enough to guarantee nearby grid cell centers hit.
+            # Expand object footprints to at least one cell in each direction including corners
+            # this guarantees they actually appear on the cost map
             half_x = max(size_x / 2.0, self.resolution / math.sqrt(2.0))
             half_y = max(size_y / 2.0, self.resolution / math.sqrt(2.0))
             radius = math.hypot(half_x, half_y)
+            # Compute the object bounds in grid indices
             min_x = max(
                 0,
                 math.floor((center_x - radius - self.x_min) / self.resolution),
@@ -116,21 +123,18 @@ class ObjectMapToGrid(Node):
             )
 
             for cell_y in range(min_y, max_y + 1):
+                # Add 0.5 offset to get teh center of each cell
                 world_y = self.y_min + (cell_y + 0.5) * self.resolution
                 for cell_x in range(min_x, max_x + 1):
                     world_x = self.x_min + (cell_x + 0.5) * self.resolution
                     delta_x = world_x - center_x
                     delta_y = world_y - center_y
+                    # Rotate the cell from world frame into the object's local frame
                     local_x = cosine * delta_x + sine * delta_y
                     local_y = -sine * delta_x + cosine * delta_y
                     if abs(local_x) <= half_x and abs(local_y) <= half_y:
                         grid.data[cell_y * self.width + cell_x] = 100
 
-        time_end = self.get_clock().now()
-        self.get_logger().info(
-            f"Converted {len(object_map.array)} objects to grid in "
-            f"{(time_end - time_start).nanoseconds / 1e6:.2f} ms"
-        )
         self.map_publisher.publish(grid)
 
 

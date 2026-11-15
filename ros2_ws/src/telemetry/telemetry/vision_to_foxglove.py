@@ -2,7 +2,7 @@ import math
 
 import rclpy
 from rclpy.node import Node
-from rclpy.qos import qos_profile_sensor_data
+from rclpy.qos import qos_profile_sensor_data, QoSProfile, ReliabilityPolicy, DurabilityPolicy
 import tf2_ros
 import tf2_geometry_msgs
 from tf_transformations import quaternion_from_euler
@@ -23,6 +23,7 @@ from foxglove_msgs.msg import (
 from geometry_msgs.msg import PointStamped, Pose, Vector3, Point, PoseStamped
 from tf_transformations import quaternion_matrix, concatenate_matrices, translation_matrix, euler_matrix, inverse_matrix, quaternion_from_matrix
 import numpy as np
+from nav_msgs.msg._path import Path
 
 
 class SceneConverterNode(Node):
@@ -122,12 +123,31 @@ class SceneConverterNode(Node):
         except Exception as e:
             self.get_logger().warning(f"Could not load config from vision_pipeline.yaml: {e}")
 
+        plan_sub_qos = QoSProfile(
+            depth=10,
+            reliability=ReliabilityPolicy.RELIABLE,
+            durability=DurabilityPolicy.VOLATILE,
+        )
+
+        path_viz_qos = QoSProfile(
+            depth=1,
+            reliability=ReliabilityPolicy.RELIABLE,
+            durability=DurabilityPolicy.TRANSIENT_LOCAL,
+        )
+
         # Subscriptions
         self.subscription = self.create_subscription(
             VisionObjectArray,
             input_topic,
             self.listener_callback,
             10)
+
+
+        self.plan_sub = self.create_subscription(
+            Path,
+            "/plan",
+            self.plan_callback,
+            plan_sub_qos)
         
         # Publishers
         self.scene_publisher = self.create_publisher(SceneUpdate, '/foxglove/scene_objects', 10)
@@ -146,6 +166,8 @@ class SceneConverterNode(Node):
             10)
         
         self.raw_scene_publisher = self.create_publisher(SceneUpdate, '/foxglove/front_cam_detections', 10)
+
+        self.plan_viz_publisher = self.create_publisher(Path, '/plan_viz', path_viz_qos)
 
         # TF2 listener replaced with direct subscription to /state/pose for lower latency
         self.latest_auv_pose = None
@@ -491,6 +513,13 @@ class SceneConverterNode(Node):
 
         self.table_publisher.publish(table_msg)
         self.scene_publisher.publish(scene_update)
+
+    def plan_callback(self, msg: Path):
+        print("!!!!!!!!!! got a plan message !!!!!!!!!!!")
+        for p in msg.poses:
+            if not p.header.frame_id:
+                p.header = msg.header
+        self.plan_viz_publisher.publish(msg)
 
 def main(args=None):
     rclpy.init(args=args)
