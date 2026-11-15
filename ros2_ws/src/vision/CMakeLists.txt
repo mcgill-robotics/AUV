@@ -126,6 +126,9 @@ if(CMAKE_CUDA_COMPILER AND TensorRT_FOUND)
     target_include_directories(front_cam_object_detection SYSTEM PRIVATE ${ZED_INCLUDE_DIRS})
     target_link_directories(front_cam_object_detection PRIVATE ${ZED_LIBRARY_DIR})
     target_link_libraries(front_cam_object_detection ${ZED_LIBRARIES} CUDA::cudart)
+    # libsl_zed.so needs Jetson driver libs (libcuda, Argus, nvbufsurface) that only exist on the device;
+    # the CI image lacks them, so let them resolve at runtime.
+    target_link_options(front_cam_object_detection PRIVATE "LINKER:--allow-shlib-undefined")
     message(STATUS "vision: front_cam_object_detection built with ZED SDK ${ZED_VERSION}")
   else()
     message(STATUS "vision: ZED SDK not found, front_cam_object_detection supports has_zed_sdk:=false only")
