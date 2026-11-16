@@ -15,7 +15,7 @@ views {
     description '''
       Read left to right: goal, setpoints, one effort per controller, one wrench, eight thrusters. Each controller reads its own sensor topic in the vehicle frame (auv_frame/...); navigation_server reads state/pose to know when you arrived. Teleop skips the controllers. The planner also turns all four controllers on at start (they start disabled). Legend and words: view 1.
 
-      ![PID with feed-forward, worked through for depth](img/pid-loop.svg)
+      ![PID with feed-forward, worked through for depth](/img/pid-loop.svg)
     '''
     autoLayout LeftRight
     include auv.controls.*, auv.propulsion.*, auv.teleop.*
@@ -48,7 +48,7 @@ views {
     description '''
       The tree ticks the running task 3 times a second. Tasks read the latest messages from the blackboard and send navigate goals. At start, the tree enables the controllers.
 
-      ![The mission tree](img/mission-tree.svg)
+      ![The mission tree](/img/mission-tree.svg)
     '''
     autoLayout LeftRight
     include auv.planner.*, auv.planner.tasks.*

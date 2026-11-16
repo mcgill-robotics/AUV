@@ -40,7 +40,7 @@ views {
         The task aims at that **panel**, not the middle of the gate: stop 2 m in front of it, then drive 0.5 m past it.
         "Through" is the gate's facing if the map has it, otherwise the line between the two panels, otherwise the direction from the vehicle to the gate.
 
-        ![Gate approach: stop 2 m in front of the chosen panel, then pass 0.5 m beyond it](img/gate-approach.svg)
+        ![Gate approach: stop 2 m in front of the chosen panel, then pass 0.5 m beyond it](/img/gate-approach.svg)
 
         Watch out: a remembered gate always looks fresh. `frames_since_last_seen` stops counting once its track is lost.
       '''
@@ -82,7 +82,7 @@ views {
         `sensors` converts each one into the AUV frame once, so nothing downstream has to.
         How the devices reach these drivers: view 3.
 
-        ![The two frames: pool_link is fixed, auv_link moves with the vehicle](img/frames.svg)
+        ![The two frames: pool_link is fixed, auv_link moves with the vehicle](/img/frames.svg)
       '''
     }
     auv.drivers.dvlDrv -> auv.sensors.imuProc 'dvl/dead_reckoning: heading, to stop yaw drift' {
@@ -116,7 +116,7 @@ views {
       notes '''
         The same topic goes to the planner and the down camera. Everyone agrees on where the vehicle is.
 
-        ![state/pose: orientation from the IMU, x and y from the DVL, z is minus the depth](img/pose-fusion.svg)
+        ![state/pose: orientation from the IMU, x and y from the DVL, z is minus the depth](/img/pose-fusion.svg)
       '''
     }
   }
@@ -145,7 +145,7 @@ views {
 
         Then the flat-port correction: water bends the light at the camera window, so everything looks closer than it is. Two fixes: the depth is scaled up (1.4 in the centre, more toward the left and right edges; only when the depth comes from the stereo depth map), and x and y are bent back with Snell.
 
-        ![Flat port: the ray bends at the window, the object looks closer](img/flat-port.svg)
+        ![Flat port: the ray bends at the window, the object looks closer](/img/flat-port.svg)
       '''
     }
     auv.vision.front.emit -> auv.vision.map.xform 'Detection frame, pose attached'
@@ -168,11 +168,11 @@ views {
       notes '''
         How a detection gets into pool_link:
 
-        ![From the camera frame to pool_link](img/to-pool-frame.svg)
+        ![From the camera frame to pool_link](/img/to-pool-frame.svg)
 
         Each object on the course gets a track: a Kalman filter on its position. Nothing on the course moves, so the model is static.
 
-        ![Track life: tentative, confirmed, back to tentative, deleted](img/tracker-lifecycle.svg)
+        ![Track life: tentative, confirmed, back to tentative, deleted](/img/tracker-lifecycle.svg)
       '''
     }
     auv.vision.map.tracker.cost -> auv.vision.map.tracker.match 'Distances. Wrong class or too far is blocked.'
@@ -208,7 +208,7 @@ views {
         notes '''
           Each controller turns its own error into an effort.
 
-          ![PID with feed-forward, worked through for depth](img/pid-loop.svg)
+          ![PID with feed-forward, worked through for depth](/img/pid-loop.svg)
         '''
       }
       auv.controls.nav.publishSp -> auv.controls.attitude 'quaternion_setpoint'
@@ -218,7 +218,7 @@ views {
       notes '''
         The clock starts when the error is inside the tolerance. The goal succeeds after it stays there for hold_time.
 
-        ![A goal succeeds after the error stays inside the tolerance for hold_time](img/nav-hold.svg)
+        ![A goal succeeds after the error stays inside the tolerance for hold_time](/img/nav-hold.svg)
       '''
     }
     auv.controls.nav.execute -[reply]-> auv.planner.tasks 'Feedback at 10 Hz, then success or failure' {
@@ -245,7 +245,7 @@ views {
         The controllers think in the pool frame ("go along pool x"). The thrusters push in the body frame ("go forward").
         The IMU orientation turns one into the other.
 
-        ![Same push, two frames](img/body-frame.svg)
+        ![Same push, two frames](/img/body-frame.svg)
       '''
     }
     auv.controls.superimposer.rotate -> auv.controls.superimposer.torque 'Force in the body frame'
@@ -256,7 +256,7 @@ views {
         Six numbers in (3 forces, 3 torques), eight thrusters out. The pseudo-inverse finds the smallest set of forces that makes the wrench.
         A disabled thruster is a zeroed column. Thruster 4 (front right) is disabled in `propulsion.launch.py`.
 
-        ![Thruster layout, seen from above](img/thrusters.svg)
+        ![Thruster layout, seen from above](/img/thrusters.svg)
       '''
     }
     auv.propulsion.mapper.pwm -> auv.drivers.microros 'propulsion/microseconds, 1228 to 1768 us'
@@ -275,7 +275,7 @@ views {
       notes '''
         thrust_mapper publishes the forces as well as the PWM. On the real vehicle nothing reads the forces. In the sim, Unity does.
 
-        ![The sim loop](img/sim-loop.svg)
+        ![The sim loop](/img/sim-loop.svg)
       '''
     }
     auv.tcp -> sim.physics.thrusters 'TCP, port 10000'
@@ -300,7 +300,7 @@ views {
       notes '''
         Labels come free: Unity knows where every object is. Water, camera and textures change every frame so the model does not memorise one look.
 
-        ![Synthetic data, step by step](img/synth-data.svg)
+        ![Synthetic data, step by step](/img/synth-data.svg)
       '''
     }
     sim.synth.labelers -> sim.solo 'SOLO files (Unity Perception output: JSON + PNG)'

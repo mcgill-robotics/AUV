@@ -29,7 +29,7 @@ model {
         The planner can change the heights at runtime once the DVL has measured the table.
         Yaw comes from the largest contour (`minAreaRect`).
 
-        ![Down camera: the ray stops at a plane of known height](img/downcam-projection.svg)
+        ![Down camera: the ray stops at a plane of known height](/img/downcam-projection.svg)
       '''
       technology 'Python, RF-DETR segmentation'
     }

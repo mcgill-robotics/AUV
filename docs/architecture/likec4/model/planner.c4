@@ -11,7 +11,7 @@ model {
         It waits for a mission number on `/mission_selector`, waits `startup_delay` (30 s), then **enables the four controllers**:
         on the real vehicle they start with `enabled: false`. The mission is recorded to a rosbag by default.
 
-        ![The mission tree](img/mission-tree.svg)
+        ![The mission tree](/img/mission-tree.svg)
       '''
       technology 'py_trees_ros'
     }

@@ -34,7 +34,7 @@ views {
       Read left to right: sensors and vision describe the world, the planner decides, controls and propulsion move the vehicle.
       Everything that touches hardware goes through the drivers (view 3). Cameras are read by vision directly.
 
-      ![The two frames: pool_link is fixed, auv_link moves with the vehicle](img/frames.svg)
+      ![The two frames: pool_link is fixed, auv_link moves with the vehicle](/img/frames.svg)
     '''
     autoLayout LeftRight
     include auv.sensors, auv.vision, auv.planner, auv.controls, auv.propulsion, auv.teleop

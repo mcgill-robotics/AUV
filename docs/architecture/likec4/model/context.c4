@@ -46,7 +46,7 @@ model {
       description '''
         Every sensor is converted into the AUV frame once, then fused into `state/pose`.
 
-        ![The two frames: pool_link is fixed, auv_link moves with the vehicle](img/frames.svg)
+        ![The two frames: pool_link is fixed, auv_link moves with the vehicle](/img/frames.svg)
       '''
     }
     controls = app 'controls' {

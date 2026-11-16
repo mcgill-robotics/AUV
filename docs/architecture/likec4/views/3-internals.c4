@@ -6,7 +6,7 @@ views {
     description '''
       Detections arrive with a 3D position already computed (by the detectors). object_map moves them into pool_link, tracks them, and publishes the map. Unique objects stay.
 
-      ![From the camera frame to pool_link](img/to-pool-frame.svg)
+      ![From the camera frame to pool_link](/img/to-pool-frame.svg)
     '''
     autoLayout LeftRight
     include auv.vision.map.*
@@ -31,7 +31,7 @@ views {
     description '''
       Orientation from the IMU, z from depth, x and y from the DVL. One message, state/pose, for everyone.
 
-      ![state/pose: orientation from the IMU, x and y from the DVL, z is minus the depth](img/pose-fusion.svg)
+      ![state/pose: orientation from the IMU, x and y from the DVL, z is minus the depth](/img/pose-fusion.svg)
     '''
     autoLayout LeftRight
     include auv.sensors.stateAgg.*

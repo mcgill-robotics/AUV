@@ -17,7 +17,7 @@ model {
         Grows the covariance with distance. Skips the frame if the TF is missing.
         Front and down detections use the same steps, then go to separate tracker instances.
 
-        ![From the camera frame to pool_link](img/to-pool-frame.svg)
+        ![From the camera frame to pool_link](/img/to-pool-frame.svg)
       '''
     }
     tracker = component 'Track objects' {
@@ -27,7 +27,7 @@ model {
         Two instances of the same class. Front: confirmed after 20 hits, jump limit 1.5 m.
         Down: confirmed after 10 hits, jump limit 2.0 m. Steps are in Flow 4.
 
-        ![Track life: tentative, confirmed, back to tentative, deleted](img/tracker-lifecycle.svg)
+        ![Track life: tentative, confirmed, back to tentative, deleted](/img/tracker-lifecycle.svg)
       '''
       link https://github.com/mcgill-robotics/AUV/blob/main/ros2_ws/src/vision/vision/object_map/object_tracker.cpp 'object_tracker.cpp'
     }
@@ -140,7 +140,7 @@ model {
         - **Lateral** (`apply_snells_law_lateral`): the pixel's ray angle is bent back with Snell (index 1.333), then x and y are taken at the corrected depth. Every method does this.
         - known_height gets its distance from the box height, with Snell applied to that angle.
 
-        ![Flat port: the ray bends at the window, the object looks closer](img/flat-port.svg)
+        ![Flat port: the ray bends at the window, the object looks closer](/img/flat-port.svg)
 
         Then a covariance from the depth spread plus a distance term.
       '''
@@ -188,7 +188,7 @@ model {
       technology 'state_aggregator · pose assembly, 50 Hz'
       summary 'Combines the three into state/pose. Optional TF from pool_link to auv_link.'
       description '''
-        ![state/pose: orientation from the IMU, x and y from the DVL, z is minus the depth](img/pose-fusion.svg)
+        ![state/pose: orientation from the IMU, x and y from the DVL, z is minus the depth](/img/pose-fusion.svg)
       '''
     }
   }
@@ -214,7 +214,7 @@ model {
       description '''
         Computes the target, publishes setpoints, checks the error every cycle, tracks time in tolerance, sends feedback at 10 Hz.
 
-        ![A goal succeeds after the error stays inside the tolerance for hold_time](img/nav-hold.svg)
+        ![A goal succeeds after the error stays inside the tolerance for hold_time](/img/nav-hold.svg)
       '''
     }
     target = component 'Compute target' {
@@ -257,7 +257,7 @@ model {
       technology 'superimposer · inverse IMU quaternion'
       summary 'Controllers think in the pool frame. Thrusters push in the body frame.'
       description '''
-        ![Same push, two frames](img/body-frame.svg)
+        ![Same push, two frames](/img/body-frame.svg)
       '''
     }
     torque = component 'Add torque' {
@@ -296,7 +296,7 @@ model {
       description '''
         Built from the thruster geometry (a to e, alpha, dx, dy in `propulsion.launch.py`). Thruster 4 is disabled at launch.
 
-        ![Thruster layout, seen from above](img/thrusters.svg)
+        ![Thruster layout, seen from above](/img/thrusters.svg)
       '''
     }
     pwm = component 'Convert to PWM' {
@@ -326,7 +326,7 @@ model {
         `approach_distance` and `pass_distance` are set there too.
         Which way is "through": the gate's facing if the map has it, otherwise the line between the two panels, otherwise the direction from the AUV to the gate.
 
-        ![Gate approach: stop 2 m in front of the chosen panel, then pass 0.5 m beyond it](img/gate-approach.svg)
+        ![Gate approach: stop 2 m in front of the chosen panel, then pass 0.5 m beyond it](/img/gate-approach.svg)
       '''
       link https://github.com/mcgill-robotics/AUV/blob/main/ros2_ws/src/planner/planner/missions/robosub2026/gate_task.py 'gate_task.py'
     }

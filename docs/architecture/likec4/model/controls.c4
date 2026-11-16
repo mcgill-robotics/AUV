@@ -24,7 +24,7 @@ model {
       description '''
         In: auv_frame/depth, depth_setpoint. Out: /controls/depth_effort (Wrench). 10 Hz.
 
-        ![PID with feed-forward, worked through for depth](img/pid-loop.svg)
+        ![PID with feed-forward, worked through for depth](/img/pid-loop.svg)
       '''
       technology 'Python'
     }
