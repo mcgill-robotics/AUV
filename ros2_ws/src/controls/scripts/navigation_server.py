@@ -7,6 +7,8 @@ controllers (depth, X, Y, attitude) for goal-driven navigation.
 
 Subscribes:
     state/pose (geometry_msgs/PoseStamped) - current AUV pose in pool frame
+    /plan (nav_msgs/Path) - Nav2's latest computed path
+    /cmd_vel_nav (geometry_msgs/Twist) - Nav2 controller velocity command
 
 Publishes setpoints to:
     /controls/depth_setpoint (std_msgs/Float64)
@@ -19,14 +21,16 @@ import math
 import threading
 import rclpy
 from rclpy.node import Node
-from rclpy.action import ActionServer, CancelResponse, GoalResponse
+from rclpy.action import ActionServer, CancelResponse, GoalResponse, ActionClient
 from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.qos import QoSProfile, ReliabilityPolicy, DurabilityPolicy, HistoryPolicy
 
-from geometry_msgs.msg import PoseStamped, Quaternion, Vector3
+from geometry_msgs.msg import PoseStamped, Quaternion, Twist, Vector3
 from std_msgs.msg import Float64
 from auv_msgs.action import AUVNavigate
+from nav_msgs.msg import Path
+from nav2_msgs.action import ComputePathToPose, FollowPath
 
 from controls.utils import yaw_from_quaternion
 import numpy as np
@@ -46,19 +50,45 @@ class NavigationServer(Node):
         self.declare_parameter('x_setpoint_topic', '/controls/x_setpoint')
         self.declare_parameter('y_setpoint_topic', '/controls/y_setpoint')
         self.declare_parameter('quat_setpoint_topic', '/controls/quaternion_setpoint')
+        self.declare_parameter('plan_topic', '/plan')
+        self.declare_parameter('cmd_vel_topic', '/cmd_vel_nav')
+        self.declare_parameter('planner_action', '/compute_path_to_pose')
+        self.declare_parameter('controller_action', '/follow_path')
+        self.declare_parameter('replanning_rate_hz', 1.0)
+        self.declare_parameter('carrot_distance', 0.5)
+        self.declare_parameter('planning_frame', 'pool_link')
+        self.declare_parameter('planner_id', 'GridBased')
+
+        self._planner_client = ActionClient(
+            self, ComputePathToPose, self.get_parameter('planner_action').value
+        )
+        self._controller_client = ActionClient(
+            self, FollowPath, self.get_parameter('controller_action').value
+        )
 
         self.feedback_rate_hz = self.get_parameter('feedback_rate_hz').value
         state_topic = self.get_parameter('state_topic').value
+        plan_topic = self.get_parameter('plan_topic').value
+        cmd_vel_topic = self.get_parameter('cmd_vel_topic').value
         depth_setpoint_topic = self.get_parameter('depth_setpoint_topic').value
         x_setpoint_topic = self.get_parameter('x_setpoint_topic').value
         y_setpoint_topic = self.get_parameter('y_setpoint_topic').value
         quat_setpoint_topic = self.get_parameter('quat_setpoint_topic').value
         self._feedback_period = 1.0 / self.feedback_rate_hz
+        self._replanning_period = 1.0 / float(
+            self.get_parameter('replanning_rate_hz').value
+        )
+        self._carrot_distance = float(self.get_parameter('carrot_distance').value)
+        self._planning_frame = self.get_parameter('planning_frame').value
+        self._planner_id = self.get_parameter('planner_id').value
 
         # ── State ────────────────────────────────────────────────────────────
         self.current_pose = None  # Latest PoseStamped from state_aggregator
         self._goal_handle = None
         self._goal_lock = threading.Lock()
+        self._planning_goal = None
+        self._planning_goal_request = None
+        self._controller_goal_handle = None
 
         # Cache the last published quaternion setpoint to prevent drift
         # on uncontrolled DOFs when sending successive partial-orientation commands.
@@ -92,11 +122,31 @@ class NavigationServer(Node):
             callback_group=self.cb_group,
         )
 
+        self.plan_sub = self.create_subscription(
+            Path,
+            plan_topic,
+            self._plan_callback,
+            sensor_qos,
+            callback_group=self.cb_group,
+        )
+        self.cmd_vel_sub = self.create_subscription(
+            Twist,
+            cmd_vel_topic,
+            self._cmd_vel_callback,
+            sensor_qos,
+            callback_group=self.cb_group,
+        )
+
         # ── Publishers: controller setpoints ─────────────────────────────────
         self.pub_depth_sp = self.create_publisher(Float64, depth_setpoint_topic, setpoint_qos)
         self.pub_x_sp = self.create_publisher(Float64, x_setpoint_topic, setpoint_qos)
         self.pub_y_sp = self.create_publisher(Float64, y_setpoint_topic, setpoint_qos)
         self.pub_quat_sp = self.create_publisher(Quaternion, quat_setpoint_topic, setpoint_qos)
+        self.replan_timer = self.create_timer(
+            self._replanning_period,
+            self._replan_callback,
+            callback_group=self.cb_group,
+        )
 
         # ── Action server ────────────────────────────────────────────────────
         self.action_server = ActionServer(
@@ -114,6 +164,84 @@ class NavigationServer(Node):
     # ─────────────────────────────────────────────────────────────────────────
     # Callbacks
     # ─────────────────────────────────────────────────────────────────────────
+
+    def _replan_callback(self):
+        """Request a fresh path for the active navigation goal."""
+        if self._planning_goal is not None:
+            self._request_path()
+
+    def _request_path(self):
+        """Ask Nav2 to compute a path to the active goal."""
+        if not self._planner_client.wait_for_server(timeout_sec=0.1):
+            self.get_logger().warn('Planner action server not available')
+            return
+
+        goal_msg = ComputePathToPose.Goal()
+        goal_msg.goal = self._planning_goal
+        goal_msg.planner_id = self._planner_id
+        future = self._planner_client.send_goal_async(goal_msg)
+        future.add_done_callback(self._planner_goal_response_callback)
+
+    def _planner_goal_response_callback(self, future):
+        goal_handle = future.result()
+        if not goal_handle.accepted:
+            self.get_logger().warn('Planner rejected the path request')
+
+    def _plan_callback(self, msg: Path):
+        """Forward incoming path plans to the controller action server."""
+        if not self._controller_client.wait_for_server(timeout_sec=1.0):
+            self.get_logger().warn('Controller action server not available, cannot forward plan')
+            return
+
+        if self._controller_goal_handle is not None:
+            self._controller_goal_handle.cancel_goal_async()
+
+        goal_msg = FollowPath.Goal()
+        goal_msg.path = msg
+        goal_msg.controller_id = "FollowPath"
+        goal_msg.goal_checker_id = "general_goal_checker"
+        goal_msg.progress_checker_id = "progress_checker"
+        future = self._controller_client.send_goal_async(goal_msg)
+        future.add_done_callback(self._controller_goal_response_callback)
+        self.get_logger().info('Forwarded path plan to controller action server')
+
+    def _controller_goal_response_callback(self, future):
+        goal_handle = future.result()
+        if goal_handle.accepted:
+            self._controller_goal_handle = goal_handle
+        else:
+            self.get_logger().warn('Controller rejected the path plan')
+
+    def _cmd_vel_callback(self, msg: Twist):
+        """Publish a position carrot in front of the vehicle for the PID loops."""
+        if self.current_pose is None or self._planning_goal_request is None:
+            return
+
+        speed = math.hypot(msg.linear.x, msg.linear.y)
+        current = self.current_pose.pose.position
+        if speed < 1e-6:
+            carrot_x = current.x
+            carrot_y = current.y
+        else:
+            yaw = yaw_from_quaternion(self.current_pose.pose.orientation)
+            pool_velocity_x = (
+                msg.linear.x * math.cos(yaw) - msg.linear.y * math.sin(yaw)
+            )
+            pool_velocity_y = (
+                msg.linear.x * math.sin(yaw) + msg.linear.y * math.cos(yaw)
+            )
+            scale = self._carrot_distance / speed
+            carrot_x = current.x + pool_velocity_x * scale
+            carrot_y = current.y + pool_velocity_y * scale
+
+        if self._planning_goal_request.do_x:
+            x_msg = Float64()
+            x_msg.data = carrot_x
+            self.pub_x_sp.publish(x_msg)
+        if self._planning_goal_request.do_y:
+            y_msg = Float64()
+            y_msg.data = carrot_y
+            self.pub_y_sp.publish(y_msg)
 
     def _pose_callback(self, msg: PoseStamped):
         """Cache the latest AUV pose."""
@@ -146,6 +274,7 @@ class NavigationServer(Node):
             self._goal_handle = goal_handle
 
         goal = goal_handle.request
+        self._planning_goal_request = goal
         result = AUVNavigate.Result()
 
         # ── Wait for state data ──────────────────────
@@ -159,11 +288,20 @@ class NavigationServer(Node):
                 result.success = False
                 result.message = 'No state/pose data received'
                 goal_handle.abort()
+                self._clear_navigation_state(goal_handle)
                 return result
 
         # ── Compute absolute target ──────────────────
         target_x, target_y, target_z, target_quat = self._compute_absolute_target(goal)
         self._log_target(goal, target_x, target_y, target_z, target_quat)
+        self._planning_goal = PoseStamped()
+        self._planning_goal.header.frame_id = self._planning_frame
+        self._planning_goal.header.stamp = self.get_clock().now().to_msg()
+        self._planning_goal.pose.position.x = target_x
+        self._planning_goal.pose.position.y = target_y
+        self._planning_goal.pose.position.z = target_z
+        self._planning_goal.pose.orientation = target_quat
+        self._request_path()
 
         # ── Publish setpoints to controllers ─────────
         self._publish_setpoints(goal, target_x, target_y, target_z, target_quat)
@@ -181,6 +319,7 @@ class NavigationServer(Node):
                 result.message = 'Goal canceled'
                 goal_handle.canceled()
                 self.get_logger().info('Goal canceled')
+                self._clear_navigation_state(goal_handle)
                 return result
 
             # Check for preemption (goal_handle becomes inactive if preempted)
@@ -238,6 +377,8 @@ class NavigationServer(Node):
                 with self._goal_lock:
                     if self._goal_handle == goal_handle:
                         self._goal_handle = None
+                        self._planning_goal = None
+                        self._planning_goal_request = None
                 self.get_logger().info(result.message)
                 return result
 
@@ -254,6 +395,8 @@ class NavigationServer(Node):
                     with self._goal_lock:
                         if self._goal_handle == goal_handle:
                             self._goal_handle = None
+                            self._planning_goal = None
+                            self._planning_goal_request = None
                     self.get_logger().warn(result.message)
                     return result
 
@@ -263,7 +406,20 @@ class NavigationServer(Node):
         result.success = False
         result.message = 'Node shutdown'
         goal_handle.abort()
+        self._clear_navigation_state(goal_handle)
         return result
+
+    def _clear_navigation_state(self, goal_handle):
+        """Stop forwarding the completed navigation goal to Nav2."""
+        with self._goal_lock:
+            if self._goal_handle != goal_handle:
+                return
+            self._goal_handle = None
+            self._planning_goal = None
+            self._planning_goal_request = None
+            if self._controller_goal_handle is not None:
+                self._controller_goal_handle.cancel_goal_async()
+                self._controller_goal_handle = None
 
     # ─────────────────────────────────────────────────────────────────────────
     # Target computation
@@ -377,20 +533,6 @@ class NavigationServer(Node):
 
     def _publish_setpoints(self, goal, target_x, target_y, target_z, target_quat):
         """Publish setpoints to the relevant PID controllers."""
-        if goal.do_z:
-            msg = Float64()
-            msg.data = -target_z  # Convert from pool Z (negative down) to depth (positive down)
-            self.pub_depth_sp.publish(msg)
-
-        if goal.do_x:
-            msg = Float64()
-            msg.data = target_x
-            self.pub_x_sp.publish(msg)
-
-        if goal.do_y:
-            msg = Float64()
-            msg.data = target_y
-            self.pub_y_sp.publish(msg)
 
         if goal.do_yaw or goal.do_roll or goal.do_pitch:
             self.pub_quat_sp.publish(target_quat)

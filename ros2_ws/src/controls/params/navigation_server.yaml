@@ -6,3 +6,13 @@ navigation_server:
 
     # State topic
     state_topic: "state/pose"
+
+    # Nav2 path following
+    plan_topic: "/plan"
+    cmd_vel_topic: "/cmd_vel_nav"
+    planner_action: "/compute_path_to_pose"
+    controller_action: "/follow_path"
+    replanning_rate_hz: 1.0
+    carrot_distance: 1.2
+    planning_frame: "pool_link"
+    planner_id: "GridBased"

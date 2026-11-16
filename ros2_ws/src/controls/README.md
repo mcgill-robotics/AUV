@@ -115,9 +115,13 @@ The package provides six ROS nodes: `depth_controller`, `attitude_controller`, `
 
 - `superimposer` output: `/controls/combined_effort`
 
-- `navigation_server` input: `/state/pose` (geometry_msgs/PoseStamped)
+- `navigation_server` input: `/state/pose` (geometry_msgs/PoseStamped), `/plan`
+  (nav_msgs/Path), and `/cmd_vel_nav` (geometry_msgs/Twist)
 
-- `navigation_server` output: Action Server `/motion/navigate`, publishers pointing to `/controls/depth_setpoint`, `/controls/x_setpoint`, `/controls/y_setpoint`, `/controls/quaternion_setpoint`
+- `navigation_server` output: Action Server `/motion/navigate`, Nav2
+  `ComputePathToPose` and `FollowPath` goals, and publishers pointing to
+  `/controls/depth_setpoint`, `/controls/x_setpoint`, `/controls/y_setpoint`,
+  `/controls/quaternion_setpoint`
 
 
 ### Published Topics

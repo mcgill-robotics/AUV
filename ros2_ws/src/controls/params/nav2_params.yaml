@@ -134,8 +134,8 @@ local_costmap:
 
       static_layer:
         plugin: "nav2_costmap_2d::StaticLayer"
-        map_topic: "/world_model/costmap"
-        map_subscribe_transient_local: false
+        map_topic: "/map"
+        map_subscribe_transient_local: true
 
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
