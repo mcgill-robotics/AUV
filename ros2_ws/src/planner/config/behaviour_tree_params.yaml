@@ -3,7 +3,7 @@ planner_root_tree:
     tick_rate        : 3.0   # (Hz) Rate at which the behaviour tree ticks
     sim              : false # Whether the simulation is enabled
     use_ground_truth : false # Whether to use the ground truth for position
-    startup_delay    : 30.0   # (s) Delay before actually starting the mission and enabling the controllers
+    startup_delay    : 0.0   # (s) Delay before actually starting the mission and enabling the controllers
     
     # Force tree to broadcast its state and blackboard to the network continuously
     default_snapshot_stream: true
@@ -219,7 +219,7 @@ planner_root_tree:
       octagon_exit_depth: -0.8            # (m) Depth to go to before moving horizontally out of the Octagon zone
       exit_octagon_distance: 2.0          # (m) Distance to drive horizontally at current depth out of Octagon zone before ascending
       travel_depth: -0.6                  # (m) Depth to travel at across the pool to avoid obstacles
-      do_slalom_avoidance: true           # (bool) Whether to perform L-shaped slalom avoidance path vs direct navigation to approach point
+      do_slalom_avoidance: false           # (bool) Whether to perform L-shaped slalom avoidance path vs direct navigation to approach point
       lane_y_min: -5.0                    # (m) Minimum lane Y coordinate for slalom width calculation
       lane_y_max: 25.0                     # (m) Maximum lane Y coordinate for slalom width calculation
       gate_pass_depth: -1.0               # (m) Depth to descend to before traversing the return gate

@@ -14,7 +14,7 @@ import auv_msgs.msg
 from rclpy.parameter import Parameter
 
 # AUV dependencies
-from controls import navigation_client
+from navigation import navigation_client
 import std_msgs.msg
 import dvl_msgs.msg
 

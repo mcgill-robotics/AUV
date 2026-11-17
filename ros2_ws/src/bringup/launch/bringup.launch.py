@@ -33,6 +33,12 @@ def generate_launch_description():
         default_value="true",
         description="Launch controls nodes",
     )
+
+    navigation_condition = DeclareLaunchArgument(
+        "navigation",
+        default_value="true",
+        description="Launch navigation and Nav2 nodes",
+    )
         
     sensors_condition = DeclareLaunchArgument(
         "sensors",
@@ -73,6 +79,7 @@ def generate_launch_description():
     vision = LaunchConfiguration("vision")
     enable_object_detection = LaunchConfiguration("enable_object_detection")
     controls = LaunchConfiguration("controls")
+    navigation = LaunchConfiguration("navigation")
     sensors = LaunchConfiguration("sensors")
     propulsion = LaunchConfiguration("propulsion")
     telemetry = LaunchConfiguration("telemetry")
@@ -83,6 +90,7 @@ def generate_launch_description():
     sensors_pkg_path = get_package_share_directory("sensors")
     propulsion_pkg_path = get_package_share_directory("propulsion")
     controls_pkg_path = get_package_share_directory("controls")
+    navigation_pkg_path = get_package_share_directory("navigation")
     vision_pkg_path = get_package_share_directory("vision")
     planner_pkg_path = get_package_share_directory("planner")
     ros_tcp_endpoint_pkg_path = get_package_share_directory("ros_tcp_endpoint")
@@ -91,6 +99,7 @@ def generate_launch_description():
     sensors_launch_file = os.path.join(sensors_pkg_path, "launch", "sensors.launch.py")
     propulsion_pkg_file = os.path.join(propulsion_pkg_path, "launch", "propulsion.launch.py")
     controls_launch_file = os.path.join(controls_pkg_path, "launch", "controls.launch.py")
+    navigation_launch_file = os.path.join(navigation_pkg_path, "launch", "navigation.launch.py")
     vision_launch_file = os.path.join(vision_pkg_path, "launch", "vision_pipeline.launch.py")
     planner_launch_file = os.path.join(planner_pkg_path, "launch", "planner.launch.py")
     ros_tcp_endpoint_launch_file = os.path.join(ros_tcp_endpoint_pkg_path, "launch", "endpoint.py")
@@ -125,6 +134,16 @@ def generate_launch_description():
         actions=[
             IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(controls_launch_file),
+                launch_arguments={"sim": sim}.items(),
+            )
+        ],
+    )
+
+    launch_navigation = GroupAction(
+        condition=IfCondition(navigation),
+        actions=[
+            IncludeLaunchDescription(
+                PythonLaunchDescriptionSource(navigation_launch_file),
                 launch_arguments={"sim": sim}.items(),
             )
         ],
@@ -197,6 +216,7 @@ def generate_launch_description():
         vision_condition,
         enable_object_detection_arg,
         controls_condition,
+        navigation_condition,
         sensors_condition,
         propulsion_condition,
         telemetry_condition,
@@ -206,6 +226,7 @@ def generate_launch_description():
         launch_sensors,
         launch_propulsion,
         launch_controls,
+        launch_navigation,
         launch_vision,
         launch_telemetry,
         launch_planner,

@@ -10,6 +10,7 @@ bool do_pitch                        # Control pitch angle
 
 bool is_relative                     # If true, target is relative to current pose
 bool is_local_frame                  # If true AND is_relative, offsets are in body frame (forward/sway/heave)
+bool do_path_computation             # If true, compute a path to pose, otherwise go there directly
 
 float64 position_tolerance           # Meters - convergence threshold for position
 float64 angular_tolerance            # Radians - convergence threshold for orientation

@@ -3,7 +3,7 @@ from planner.missions.mission_behaviour_components import BasicActionBehaviour, 
 import py_trees
 import math
 import planner.missions.vision_behaviours as vision_behaviours
-from controls.goal_helpers import move_global, move_robot_centric, look_at, set_depth
+from navigation.goal_helpers import move_global, move_robot_centric, look_at, set_depth
 from planner.missions.action_status_enum import ActionStatus
 import geometry_msgs.msg._pose
 import transforms3d
@@ -453,6 +453,7 @@ class FollowDowncamBin(py_trees.behaviour.Behaviour):
         self.blackboard = self.attach_blackboard_client(name=self.name)
         self.action_status = ActionStatus.PENDING
         self.bins_params = bins_params or {}
+        self.goal = None
         # initialize config-backed fields from yaml (fail if missing)
         self.downcam_fov_horizontal = self.bins_params['downcam_fov_horizontal']
         self.downcam_fov_vertical = self.bins_params['downcam_fov_vertical']

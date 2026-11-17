@@ -8,8 +8,8 @@ import rclpy
 from rclpy.node import Node
 
 # AUV dependencies
-from controls import navigation_client
-from controls.goal_helpers import set_depth, move_global
+from navigation import navigation_client
+from navigation.goal_helpers import set_depth, move_global
 
 # Planner dependencies
 from ..mission_behaviour_components import BasicActionBehaviour, TimerBehaviour

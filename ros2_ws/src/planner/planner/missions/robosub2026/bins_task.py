@@ -2,7 +2,7 @@ import py_trees
 import planner.missions.vision_behaviours as vision_behaviours
 from planner.missions.robosub2026.bins_behaviors import FindBinStructure, ApproachObject, AlignCorrectBin
 from planner.missions.mission_behaviour_components import BasicActionBehaviour
-from controls.goal_helpers import set_depth
+from navigation.goal_helpers import set_depth
 
 class BinsTask(py_trees.composites.Sequence):
     """

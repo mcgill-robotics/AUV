@@ -84,11 +84,11 @@ class NavigationServer(Node):
 
         # ── State ────────────────────────────────────────────────────────────
         self.current_pose = None  # Latest PoseStamped from state_aggregator
-        self._goal_handle = None
+        self._goal_handle = None  # active navigation goal handle
         self._goal_lock = threading.Lock()
-        self._planning_goal = None
-        self._planning_goal_request = None
-        self._controller_goal_handle = None
+        self._planning_goal = None # Latest PoseStamped sent to Nav2 for path computation
+        self._planning_goal_request = None # Latest AUVNavigate goal request
+        self._controller_goal_handle = None # Latest FollowPath goal handle sent to Nav2 controller
 
         # Cache the last published quaternion setpoint to prevent drift
         # on uncontrolled DOFs when sending successive partial-orientation commands.
@@ -214,7 +214,7 @@ class NavigationServer(Node):
 
     def _cmd_vel_callback(self, msg: Twist):
         """Publish a position carrot in front of the vehicle for the PID loops."""
-        if self.current_pose is None or self._planning_goal_request is None:
+        if self.current_pose is None or self._planning_goal_request is None or not self._planning_goal_request.do_path_computation:
             return
 
         speed = math.hypot(msg.linear.x, msg.linear.y)
@@ -294,17 +294,24 @@ class NavigationServer(Node):
         # ── Compute absolute target ──────────────────
         target_x, target_y, target_z, target_quat = self._compute_absolute_target(goal)
         self._log_target(goal, target_x, target_y, target_z, target_quat)
-        self._planning_goal = PoseStamped()
-        self._planning_goal.header.frame_id = self._planning_frame
-        self._planning_goal.header.stamp = self.get_clock().now().to_msg()
-        self._planning_goal.pose.position.x = target_x
-        self._planning_goal.pose.position.y = target_y
-        self._planning_goal.pose.position.z = target_z
-        self._planning_goal.pose.orientation = target_quat
-        self._request_path()
 
-        # ── Publish setpoints to controllers ─────────
-        self._publish_setpoints(goal, target_x, target_y, target_z, target_quat)
+        # if goal.do_path_computation is True, request a path from Nav2; otherwise, publish setpoints directly
+        if goal.do_path_computation:
+            self._planning_goal = PoseStamped()
+            self._planning_goal.header.frame_id = self._planning_frame
+            self._planning_goal.header.stamp = self.get_clock().now().to_msg()
+            self._planning_goal.pose.position.x = target_x
+            self._planning_goal.pose.position.y = target_y
+            self._planning_goal.pose.position.z = target_z
+            self._planning_goal.pose.orientation = target_quat
+            self._request_path()
+
+        else:
+            self._planning_goal = None
+            if self._controller_goal_handle is not None:
+                self._controller_goal_handle.cancel_goal_async()
+                self._controller_goal_handle = None
+            self._publish_setpoints(goal, target_x, target_y, target_z, target_quat)
 
         # ── Feedback loop ────────────────────────────
         feedback_msg = AUVNavigate.Feedback()
@@ -533,6 +540,20 @@ class NavigationServer(Node):
 
     def _publish_setpoints(self, goal, target_x, target_y, target_z, target_quat):
         """Publish setpoints to the relevant PID controllers."""
+        if goal.do_z:
+            msg = Float64()
+            msg.data = -target_z
+            self.pub_depth_sp.publish(msg)
+
+        if goal.do_x:
+            msg = Float64()
+            msg.data = target_x
+            self.pub_x_sp.publish(msg)
+
+        if goal.do_y:
+            msg = Float64()
+            msg.data = target_y
+            self.pub_y_sp.publish(msg)
 
         if goal.do_yaw or goal.do_roll or goal.do_pitch:
             self.pub_quat_sp.publish(target_quat)

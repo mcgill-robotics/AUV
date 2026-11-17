@@ -1,6 +1,6 @@
 import math
 import py_trees
-from controls.goal_helpers import move_global, set_depth
+from navigation.goal_helpers import move_global, set_depth
 from controls.utils import normalize_angle, find_normal_from_quaternion, Vector2D
 from ..action_status_enum import ActionStatus
 from ..mission_behaviour_components import BasicActionBehaviour
@@ -134,6 +134,7 @@ class NavigateToReturnPoint(py_trees.behaviour.Behaviour):
             y=target_y,
             yaw=target_yaw,
             do_z=False,
+            do_path_computation=True,
             tolerance=self.position_tolerance,
             hold_time=self.hold_time,
             timeout=self.timeout,

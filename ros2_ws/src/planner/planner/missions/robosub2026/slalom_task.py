@@ -1,6 +1,6 @@
 import math
 import py_trees
-from controls.goal_helpers import set_depth, translate_field_centric
+from navigation.goal_helpers import set_depth, translate_field_centric
 from ..mission_behaviour_components import BasicActionBehaviour
 from ..vision_behaviours import ScanBehaviour, SearchSweepBehaviour, GoNearObject
 from .slalom_behaviours import SlalomLayer, ForceBlindDriveBehaviour, RecordSlalomLayerPositionBehaviour

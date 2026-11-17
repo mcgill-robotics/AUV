@@ -5,7 +5,7 @@ from typing import Optional, Tuple, Callable
 from ..mission_behaviour_components import BasicActionBehaviour
 import controls.utils as geometry
 from controls.utils import Vector2D
-from controls.goal_helpers import set_attitude_quaternion,move_global, move_to_pose
+from navigation.goal_helpers import set_attitude_quaternion,move_global, move_to_pose
 from enum import Enum
 from auv_msgs.msg import VisionObject
 import copy

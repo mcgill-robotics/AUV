@@ -93,11 +93,12 @@ To send a test 3D goal to the Navigation Server via the ROS 2 Action CLI:
           timeout: 30.0
         }" --feedback
 
-To send a goal programmatically using Python, utilize the `goal_helpers` library included in `controls/goal_helpers.py`. See `test_nav.py` for examples.
+To send a goal programmatically using Python, utilize the `goal_helpers` library
+included in `navigation/goal_helpers.py`. See `test_nav.py` for examples.
 
 
 ## Nodes
-The package provides six ROS nodes: `depth_controller`, `attitude_controller`, `x_controller`, `y_controller`, `superimposer`, and `navigation_server`.
+The package provides five ROS nodes: `depth_controller`, `attitude_controller`, `x_controller`, `y_controller`, and `superimposer`.
 
 - `depth_controller` input: `/auv_frame/depth`, `/controls/depth_setpoint`
 
@@ -115,13 +116,7 @@ The package provides six ROS nodes: `depth_controller`, `attitude_controller`, `
 
 - `superimposer` output: `/controls/combined_effort`
 
-- `navigation_server` input: `/state/pose` (geometry_msgs/PoseStamped), `/plan`
-  (nav_msgs/Path), and `/cmd_vel_nav` (geometry_msgs/Twist)
-
-- `navigation_server` output: Action Server `/motion/navigate`, Nav2
-  `ComputePathToPose` and `FollowPath` goals, and publishers pointing to
-  `/controls/depth_setpoint`, `/controls/x_setpoint`, `/controls/y_setpoint`,
-  `/controls/quaternion_setpoint`
+- Navigation is provided by the separate `navigation` package.
 
 
 ### Published Topics
@@ -173,7 +168,7 @@ The package provides six ROS nodes: `depth_controller`, `attitude_controller`, `
 
 - `sensors` - for utility functions
 
-- `scipy` - Used by `navigation_server` and `controls.utils` for 3D coordinate transformations.
+- `scipy` - Used by the navigation package for 3D coordinate transformations.
 
 ### Building
 

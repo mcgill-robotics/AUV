@@ -1,7 +1,7 @@
 import py_trees
 from numpy.polynomial.polynomial import Polynomial
 from ..mission_behaviour_components import BasicActionBehaviour
-from controls.goal_helpers import set_depth
+from navigation.goal_helpers import set_depth
 from .torpedo_behaviours import *
 from ..vision_behaviours import SearchSweepBehaviour, CircleAroundToFindBehaviour, GoNearObject
 import operator

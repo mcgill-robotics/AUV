@@ -1,5 +1,5 @@
 import py_trees
-from controls.goal_helpers import set_depth
+from navigation.goal_helpers import set_depth
 import planner.missions.vision_behaviours as vision_behaviours
 from .table_octagon_behaviours import GoAboveTable, TableCleaning, LookAndSpin
 from ..mission_behaviour_components import BasicActionBehaviour

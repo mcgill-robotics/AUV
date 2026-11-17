@@ -9,7 +9,7 @@ from ..mission_behaviour_components import (
     BasicActionBehaviour,
     SetNodeParameterBehaviour,
 )
-from controls.goal_helpers import set_global_yaw, set_attitude
+from navigation.goal_helpers import set_global_yaw, set_attitude
 from controls.utils import normalize_angle, yaw_from_quaternion, quaternion_to_euler
 
 

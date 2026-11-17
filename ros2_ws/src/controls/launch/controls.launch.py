@@ -28,14 +28,6 @@ def generate_launch_description():
         FindPackageShare("controls"), "launch", "planar_controller.launch.py"
     ])
 
-    default_navigation = PathJoinSubstitution([
-        FindPackageShare("controls"), "launch", "navigation_server.launch.py"
-    ])
-
-    default_nav2_planning = PathJoinSubstitution([
-        FindPackageShare("controls"), "launch", "nav2.launch.py"
-    ])
-
     declare_attitude = DeclareLaunchArgument(
         "attitude_controller_launch_file",
         default_value=default_attitude,
@@ -56,18 +48,6 @@ def generate_launch_description():
         default_value=default_planar_controller,
         description="Path to the planar controller launch file",
     )
-    declare_navigation = DeclareLaunchArgument(
-        "navigation_server_launch_file",
-        default_value=default_navigation,
-        description="Path to the navigation server launch file",
-    )
-
-    declare_nav2_planning = DeclareLaunchArgument(
-        "path_planner_launch_file",
-        default_value=default_nav2_planning,
-        description="Path to the path planner launch file",
-    )
-
     attitude_controller_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             LaunchConfiguration("attitude_controller_launch_file")
@@ -96,18 +76,6 @@ def generate_launch_description():
         launch_arguments={"sim": sim}.items(),
     )
 
-    navigation_server_launch = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
-            LaunchConfiguration("navigation_server_launch_file")
-        )
-    )
-
-    nav2_planning_launch = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
-            LaunchConfiguration("path_planner_launch_file")
-        )
-    )
-
     debug_setpoint_service_node = Node(
         package="controls",
         executable="debug_setpoint_service.py",
@@ -121,13 +89,9 @@ def generate_launch_description():
         declare_depth,
         declare_superimposer,
         declare_planar_controller,
-        declare_navigation,
-        declare_nav2_planning,
         attitude_controller_launch,
         depth_controller_launch,
         superimposer_launch,
         planar_controller_launch,
         debug_setpoint_service_node,
-        navigation_server_launch,
-        nav2_planning_launch,
     ])

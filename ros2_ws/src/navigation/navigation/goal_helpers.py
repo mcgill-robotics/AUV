@@ -37,6 +37,7 @@ def _make_goal(
     do_yaw: bool = False,
     is_relative: bool = False,
     is_local_frame: bool = False,
+    do_path_computation: bool = False,
     position_tolerance: float = _DEFAULT_POS_TOL,
     angular_tolerance: float = _DEFAULT_ANGULAR_TOL,
     hold_time: float = _DEFAULT_HOLD,
@@ -53,6 +54,7 @@ def _make_goal(
     goal.do_yaw = do_yaw
     goal.is_relative = is_relative
     goal.is_local_frame = is_local_frame
+    goal.do_path_computation = do_path_computation
     goal.position_tolerance = position_tolerance
     goal.angular_tolerance = angular_tolerance
     goal.hold_time = hold_time
@@ -70,6 +72,7 @@ def move_to_pose(
     angular_tolerance: float = _DEFAULT_ANGULAR_TOL,
     hold_time: float = _DEFAULT_HOLD,
     timeout: float = _DEFAULT_TIMEOUT,
+    do_path_computation: bool = False
 ) -> AUVNavigate.Goal:
     """Move to an exact pose (all DOFs). Pass a VisionObject.pose directly.
 
@@ -83,6 +86,7 @@ def move_to_pose(
     return _make_goal(
         target_pose=pose,
         do_x=True, do_y=True, do_z=True, do_roll=True, do_pitch=True, do_yaw=True,
+        do_path_computation=do_path_computation,
         position_tolerance=tolerance,
         angular_tolerance=angular_tolerance,
         hold_time=hold_time,
@@ -97,6 +101,7 @@ def move_global(
     roll: float = None,
     pitch: float = None,
     yaw: float = None,
+    do_path_computation: bool = False,
     tolerance: float = _DEFAULT_POS_TOL,
     angular_tolerance: float = _DEFAULT_ANGULAR_TOL,
     hold_time: float = _DEFAULT_HOLD,
@@ -139,6 +144,7 @@ def move_global(
         target_pose=pose,
         do_x=True, do_y=True, do_z=do_z,
         do_roll=do_roll, do_pitch=do_pitch, do_yaw=do_yaw,
+        do_path_computation=do_path_computation,
         position_tolerance=tolerance,
         angular_tolerance=angular_tolerance,
         hold_time=hold_time,
@@ -152,6 +158,7 @@ def move_rigid_component_global(
     roll: float = None,
     pitch: float = None,
     yaw: float = None,
+    do_path_computation: bool = False,
     tolerance: float = _DEFAULT_POS_TOL,
     angular_tolerance: float = _DEFAULT_ANGULAR_TOL,
     hold_time: float = _DEFAULT_HOLD,
@@ -223,6 +230,7 @@ def move_rigid_component_global(
         target_pose=pose,
         do_x=True, do_y=True, do_z=do_z,
         do_roll=do_roll, do_pitch=do_pitch, do_yaw=do_yaw,
+        do_path_computation=do_path_computation,
         position_tolerance=tolerance,
         angular_tolerance=angular_tolerance,
         hold_time=hold_time,
@@ -377,6 +385,7 @@ def move_to_and_look_at(
     target_z: float,
     reference_x: float,
     reference_y: float,
+    do_path_computation: bool = False,
     position_tolerance: float = _DEFAULT_POS_TOL,
     yaw_tolerance: float = _DEFAULT_ANGULAR_TOL,
     hold_time: float = _DEFAULT_HOLD,
@@ -390,6 +399,7 @@ def move_to_and_look_at(
     return _make_goal(
         target_pose=pose,
         do_x=True, do_y=True, do_z=True, do_yaw=True,
+        do_path_computation=do_path_computation,
         position_tolerance=position_tolerance,
         angular_tolerance=yaw_tolerance,
         hold_time=hold_time,
@@ -407,6 +417,7 @@ def move_robot_centric(
     droll: float = 0.0,
     dpitch: float = 0.0,
     dyaw: float = 0.0,
+    do_path_computation: bool = False,
     tolerance: float = _DEFAULT_POS_TOL,
     angular_tolerance: float = _DEFAULT_ANGULAR_TOL,
     hold_time: float = _DEFAULT_HOLD,
@@ -448,6 +459,7 @@ def move_robot_centric(
         do_roll=do_roll, do_pitch=do_pitch, do_yaw=do_yaw,
         is_relative=True,
         is_local_frame=True,
+        do_path_computation=do_path_computation,
         position_tolerance=tolerance,
         angular_tolerance=angular_tolerance,
         hold_time=hold_time,
@@ -459,6 +471,7 @@ def translate_field_centric(
     dx: float = 0.0,
     dy: float = 0.0,
     dz: float = 0.0,
+    do_path_computation: bool = False,
     tolerance: float = _DEFAULT_POS_TOL,
     hold_time: float = _DEFAULT_HOLD,
     timeout: float = _DEFAULT_TIMEOUT,
@@ -481,6 +494,7 @@ def translate_field_centric(
         do_x=True, do_y=True, do_z=True,
         is_relative=True,
         is_local_frame=False,
+        do_path_computation=do_path_computation,
         position_tolerance=tolerance,
         hold_time=hold_time,
         timeout=timeout,

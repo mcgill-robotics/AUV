@@ -5,7 +5,7 @@ import math
 from tf2_ros.static_transform_broadcaster import StaticTransformBroadcaster, TransformStamped
 from tf_transformations import quaternion_from_euler
 import planner.missions.vision_behaviours as vision_behaviours
-from controls.goal_helpers import set_depth, move_global, move_robot_centric, move_rigid_component_global, set_global_yaw
+from navigation.goal_helpers import set_depth, move_global, move_robot_centric, move_rigid_component_global, set_global_yaw
 from planner.missions.action_status_enum import ActionStatus
 from scipy.spatial.transform import Rotation
 from ..mission_behaviour_components import BasicActionBehaviour, TimerBehaviour

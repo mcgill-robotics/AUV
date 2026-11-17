@@ -6,7 +6,7 @@ import math
 from rclpy.node import Node
 
 # AUV dependencies
-from controls.goal_helpers import set_depth, set_global_yaw, move_global, set_attitude
+from navigation.goal_helpers import set_depth, set_global_yaw, move_global, set_attitude
 
 # Planner dependencies
 from ..mission_behaviour_components import BasicActionBehaviour, TimerBehaviour

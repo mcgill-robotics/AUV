@@ -1,7 +1,7 @@
 import math
 import py_trees
 from py_trees.decorators import Retry
-from controls.goal_helpers import move_global, translate_field_centric
+from navigation.goal_helpers import move_global, translate_field_centric
 from controls.utils import yaw_from_quaternion, normalize_angle
 from ..action_status_enum import ActionStatus
 from ..mission_behaviour_components import BasicActionBehaviour

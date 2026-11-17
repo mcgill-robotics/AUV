@@ -2,7 +2,7 @@ import math
 import random
 
 import py_trees
-from controls.goal_helpers import move_global, move_to_pose, set_depth, set_global_yaw
+from navigation.goal_helpers import move_global, move_to_pose, set_depth, set_global_yaw
 from controls.utils import normalize_angle, yaw_from_quaternion
 
 from ..action_status_enum import ActionStatus

@@ -8,7 +8,7 @@ import rclpy
 from rclpy.node import Node
 
 # AUV dependencies
-from controls.goal_helpers import rotate_relative
+from navigation.goal_helpers import rotate_relative
 
 # Planner dependencies
 from ..mission_behaviour_components import BasicActionBehaviour

@@ -16,7 +16,7 @@ from auv_msgs.srv import RosbagControl
 
 # Planner dependencies
 from .action_status_enum import ActionStatus
-from controls.goal_helpers import (
+from navigation.goal_helpers import (
         _make_goal,
         _DEFAULT_POS_TOL,
         _DEFAULT_ANGULAR_TOL,

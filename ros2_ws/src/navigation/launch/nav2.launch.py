@@ -6,7 +6,7 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 
 def generate_launch_description():
-    pkg_share = get_package_share_directory("controls")
+    pkg_share = get_package_share_directory("navigation")
     nav2_bringup_share = get_package_share_directory('nav2_bringup')
 
     default_params_file = os.path.join(pkg_share, 'params', 'nav2_params.yaml')
