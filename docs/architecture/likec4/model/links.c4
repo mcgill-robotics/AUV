@@ -1,0 +1,94 @@
+// Links between systems, and the training loop.
+model {
+  // sim <-> ROS
+  auv.tcp -> sim.physics.thrusters 'propulsion/forces'
+  sim.simsensors.sdvl -> auv.tcp 'dvl/*'
+  sim.simsensors.simu -> auv.tcp 'imu/data'
+  sim.simsensors.sdepth -> auv.tcp '/sensors/depth/z'
+  sim.simsensors.gt -> auv.tcp '/auv/ground_truth/*'
+  sim.camera.camPub -> auv.tcp '/down_cam/image_raw'
+  auv.tcp -> auv.sensors.imuProc 'imu/data'
+  auv.tcp -> auv.sensors.dvlProc 'dvl/*'
+  auv.tcp -> auv.sensors.depthProc '/sensors/depth/z'
+  auv.tcp -> auv.planner.board 'ground truth (optional)'
+  auv.tcp -> auv.vision.down 'down camera image (sim)'
+  auv.tcp -> sim.reset '/simulation/reset (Bool)'
+  sim.camera.depthCam -> auv.tcp 'depth image'
+
+  // bringup
+  auv.bringup -[launch]-> auv.sensors 'includes launch'
+  auv.bringup -[launch]-> auv.controls 'includes launch'
+  auv.bringup -[launch]-> auv.propulsion 'includes launch'
+  auv.bringup -[launch]-> auv.vision 'includes launch'
+  auv.bringup -[launch]-> auv.telemetry 'includes launch'
+  auv.bringup -[launch]-> auv.planner 'includes launch (off by default)'
+  auv.bringup -[launch]-> auv.tcp 'sim:=true only'
+
+  // training loop
+  sim.converter -> training.datasets 'yolo_images, yolo_labels, data.yaml'
+  training.datasets -> training.organize 'raw_import'
+  training.organize -> training.augment 'train split'
+  training.augment -> training.train 'augmented train, plain val and test'
+  training.organize -> training.train 'val and test'
+  training.train -> training.export 'best.pth'
+  training.export -> auv.models 'weights.onnx, engine.plan'
+  training.prelabel -> roboflow 'prelabelled real images'
+  roboflow -> training.datasets 'corrected real labels'
+  auv.vision.front -> training.datasets 'collected real images (toggle_collection)'
+}
+
+// App-level summaries. These give the zoomed-out views one readable label
+// per arrow instead of "[...]". The detailed topics are on the component links.
+model {
+  auv.sensors -> auv.planner 'pose and velocity'
+  auv.sensors -> auv.controls 'state/pose, plus each sensor in the AUV frame'
+  auv.sensors -> auv.vision 'state/pose'
+  auv.vision -> auv.planner 'object map'
+  auv.planner -[call]-> auv.controls 'navigate goals, enable controllers'
+  auv.planner -[call]-> auv.vision 'set projection heights'
+}
+
+// App-level summaries for the simulator.
+model {
+  sim.simsensors -> auv.tcp 'sensor topics'
+  sim.camera -> auv.tcp 'down camera image'
+  auv.tcp -> sim.physics 'thruster forces'
+  sim.camera -> zed 'virtual ZED stream'
+}
+
+// App-level summaries, support view.
+model {
+  auv.drivers -> auv.sensors 'IMU, DVL, depth'
+  auv.tcp -> auv.sensors 'sensor topics (sim)'
+  auv.vision -> auv.telemetry 'object map, detections'
+  zed -> auv.vision.front 'image, depth, VIO pose'
+  zed -> auv 'image, depth, VIO pose'
+  auv.sensors.stateAgg.poseOut -> auv.vision 'state/pose (down camera; front only if pose_source: auv_pose)'
+}
+
+// App-level summary: the planner's actuator commands go out through micro-ROS.
+model {
+  auv.planner -> auv.drivers 'grabber and torpedo commands'
+}
+
+// System-level and package-level summaries. Each gives a zoomed-out view one
+// readable label instead of "[...]". The detailed topics are on the inner links.
+model {
+  operator -> auv 'drives with an Xbox controller'
+  auv -> operator 'live view in Foxglove'
+  hw -> auv 'IMU, DVL, depth, battery'
+  auv -> hw 'PWM, grabber, torpedo'
+  sim -> auv 'simulated sensors and down camera'
+  auv -> sim 'thruster forces'
+  sim -> zed 'virtual ZED stream'
+  sim -> training 'labelled synthetic images'
+  training -> auv 'model packages'
+  auv -> training 'collected real images'
+
+  auv.controls -> auv.propulsion 'total wrench (force + torque)'
+  auv.drivers.dvlDrv -> auv.sensors 'dvl/velocity, dvl/dead_reckoning'
+  auv.drivers -> auv.sensors.imuProc 'imu/data, dvl/dead_reckoning (yaw fix)'
+  auv.planner -[call]-> auv.controls.nav 'navigate goals (AUVNavigate action)'
+  auv.sensors -> auv.planner.board 'state/pose, DVL velocity'
+  auv.vision -> auv.planner.board 'object map, down-cam detections'
+}
