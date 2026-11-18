@@ -121,6 +121,13 @@ def generate_launch_description():
         }]
     )
 
+    system_metrics_node = Node(
+            package='telemetry',
+            executable='system_metrics_node',
+            name='system_metrics',
+            output='screen',
+        )
+
     return LaunchDescription([
         port_arg,   
         address_arg,
@@ -133,4 +140,5 @@ def generate_launch_description():
         vision_to_foxglove_node,
         setpoint_to_foxglove_node,
         rosbag_manager_node,
+        system_metrics_node
     ])

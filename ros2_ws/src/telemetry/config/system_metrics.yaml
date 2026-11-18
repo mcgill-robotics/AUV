@@ -1,0 +1,7 @@
+collection_rate : 1.0 # Measurements per second
+collect_cpu: True
+collect_gpu: True
+collect_memory: True
+collect_io: True
+collect_network: True
+on_jetson : False # GPU metric measurement only supported for jetson for now
