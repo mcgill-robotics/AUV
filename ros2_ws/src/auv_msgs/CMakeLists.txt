@@ -23,6 +23,7 @@ set(msg_files
 	"msg/FoxgloveObject.msg"
 	"msg/FoxgloveObjectArray.msg"
 	"msg/VisionObjectArray.msg"
+	"msg/SystemMetrics.msg"
 )
 
 set(srv_files
