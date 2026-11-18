@@ -11,6 +11,9 @@ class SystemMetricsNode(Node):
     def __init__(self):
         super().__init__("system_metrics_node")
         self.get_logger().info("Started the system metrics logger")
+        
+        # Paths for the Jetson gpu metrics
+        self.jetson_gpu_path = "/sys/devices/platform/17000000.gpu/load"
 
         # Get the parameter file
         default_config = os.path.join(
@@ -117,6 +120,12 @@ class SystemMetricsNode(Node):
             return float(min(100.0, max(0.0, io_percent)))
         return 0.0
 
+    def _get_gpu_usage(self, load_path):
+        """Read raw value of Jetson GPU usage from its system files"""
+        with open(load_path, "r", encoding="utf-8") as f:
+            raw_val = int(f.read().strip())
+        return raw_val / 10.0 # File outputs a 0-1000 scale
+
     def publish_system_metrics(self):
         # 1. CPU Usage & Temperature
         cpu_usage = float(psutil.cpu_percent(interval=None)) if self.collect_cpu else 0.0
@@ -130,7 +139,7 @@ class SystemMetricsNode(Node):
         io_usage = float(self._get_io_percent()) if self.collect_io else 0.0
 
         #4. Get GPU usage
-        gpu_usage = self._get_gpu_percent()
+        gpu_usage = float(self._get_gpu_usage(self.jetson_gpu_path)) if (self.collect_gpu and self.on_jetson) else 0.0
 
         # Create and publish message
         system_metric_msg = SystemMetrics()
