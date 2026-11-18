@@ -79,9 +79,12 @@ def generate_launch_description():
         default_value=str(default_config["front_cam_object_detection"]["ros__parameters"]["has_zed_sdk"]).lower(),
         description="Whether the ZED SDK is installed and available. If false, the front camera will subscribe to a ROS image topic instead of using hardware capture."
     )
+    zed_stream_ip_arg = DeclareLaunchArgument(
+        "zed_stream_ip",
+        default_value=str(default_config["front_cam_object_detection"]["ros__parameters"]["stream"]["ip"]),
+        description="IP of the ZED stream (e.g. the Unity simulator's ZED stream). Only used in sim mode with the ZED SDK."
+    )
 
-
-    
     compressed_launch_config = LaunchConfiguration("compressed")
     front_cam_topic = get_compressed_topic(default_config["front_cam_object_detection"]["ros__parameters"]["image_topic"], compressed_launch_config)
     down_cam_topic = get_compressed_topic(default_config["down_cam_object_detection"]["ros__parameters"]["image_topic"], compressed_launch_config)
@@ -160,6 +163,7 @@ def generate_launch_description():
                 'compressed': LaunchConfiguration("compressed"),
                 "enable_object_detection": enable_front_detection,
                 "has_zed_sdk": LaunchConfiguration("has_zed_sdk"),
+                "stream.ip": LaunchConfiguration("zed_stream_ip"),
                 "depth_estimation.known_planes.floor": default_config["object_map"]["ros__parameters"]["z_axis_locking"]["pool_floor_z"],
             }
         ],
@@ -311,6 +315,7 @@ def generate_launch_description():
     launch_description.add_action(down_model_arg)
     launch_description.add_action(enable_object_detection_arg)
     launch_description.add_action(has_zed_sdk_arg)
+    launch_description.add_action(zed_stream_ip_arg)
     
 
 

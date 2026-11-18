@@ -366,7 +366,7 @@ If `enable_vio_pose` is true, the node can publish `/vision/vio_pose`
 
 If `enable_vio_pose` is false, the node skips ZED positional tracking entirely.
 
-In simulation mode, if ZED SDK is available, the front camera node can grab frames directly from the ZED Unity Sim stream. The `stream` parameters configure the IP and port for that stream, which defaults to `127.0.1.1:30000`.
+In simulation mode, if ZED SDK is available, the front camera node can grab frames directly from the ZED Unity Sim stream. The `stream` parameters configure the IP and port for that stream, which defaults to `127.0.1.1:30000`. Override the IP at launch with `zed_stream_ip:=<ip>` (on `vision_pipeline.launch.py` or `bringup.launch.py`), e.g. when the simulator runs on another machine.
 
 
 ### Object Map

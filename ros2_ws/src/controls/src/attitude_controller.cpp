@@ -89,7 +89,8 @@ namespace controls
             std::bind(&AttitudeController::parameters_callback, this, std::placeholders::_1)
         );
 
-        control_timer_ = this->create_wall_timer(
+        // Node-clock timer so the loop period matches the fixed dt under sim time.
+        control_timer_ = this->create_timer(
             std::chrono::milliseconds(static_cast<int64_t>(1000 / control_loop_hz_)),   // Control loop frequency
             std::bind(&AttitudeController::control_loop_callback, this)
             );

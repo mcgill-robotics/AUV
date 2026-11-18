@@ -27,7 +27,7 @@ def generate_launch_description():
         executable="depth_controller.py",
         name="depth_controller",
         output="screen",
-        parameters=[sim_yaml],
+        parameters=[sim_yaml, {"use_sim_time": True}],
         condition=IfCondition(sim),
     )
 

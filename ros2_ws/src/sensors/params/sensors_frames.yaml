@@ -49,3 +49,5 @@ state_aggregator:
   ros__parameters:
     use_vio_for_position: false
     use_vio_for_orientation: false
+    # Must match vision's front_cam_object_detection vio_pose_topic
+    vio_pose_topic: "/vision/vio_pose"
