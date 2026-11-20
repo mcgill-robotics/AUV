@@ -66,6 +66,7 @@ $RECYCLE.BIN/
 *.onnx
 # TensorRT engine files
 *.engine
+*.engine.json
 *.plan
 *.md5
 # xauth file
