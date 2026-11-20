@@ -1,0 +1,27 @@
+%YAML:1.0
+
+# Front camera of the Unity sim (auv-sim-unity), published as the ZED left image.
+# Values derived from the sim source and the team's vision config, not from a Kalibr run:
+#   - resolution 672x376, vertical FOV 40.9 deg  (SimulationSettings defaults)
+#   - focal = (376/2)/tan(40.9deg/2) * 1.33333   (the sim scales focal by the water refraction index)
+#     -> 672.22 with water refraction ON (default). With refraction OFF use 504.17.
+#   - zero distortion (matches the sim's CameraInfo)
+#   - camera at [0.14, 0.06, -0.02] m in auv_link (vision_pipeline.yaml), IMU at the auv_link origin
+#   - optical frame: z forward, x right, y down; body/IMU frame: x forward, y left, z up
+# If the sim resolution/FOV is changed in the HUD, update intrinsics/resolution from
+#   ros2 topic echo /zed/zed_node/rgb/color/rect/camera_info --once
+cam0:
+  T_imu_cam: #rotation from camera to IMU R_CtoI, position of camera in IMU p_CinI
+    - [0.0, 0.0, 1.0, 0.14]
+    - [-1.0, 0.0, 0.0, 0.06]
+    - [0.0, -1.0, 0.0, -0.02]
+    - [0.0, 0.0, 0.0, 1.0]
+  cam_overlaps: []
+  camera_model: pinhole
+  distortion_coeffs: [0.0, 0.0, 0.0, 0.0]
+  distortion_model: radtan
+  intrinsics: [672.22, 672.22, 336.0, 188.0] #fu, fv, cu, cv
+  resolution: [672, 376]
+  rostopic: /openvins/front/image_raw
+  # The sim's 0.15 s IMU delay is removed by openvins_sim_adapter.py; the remainder is refined online.
+  timeshift_cam_imu: 0.0

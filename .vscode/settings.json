@@ -6,6 +6,8 @@
     "python.analysis.extraPaths": [
         "/opt/ros/humble/lib/python3.10/site-packages/"
     ],
+    "python.defaultInterpreterPath": "/usr/bin/python3",
+    "python.analysis.diagnosticsSource": "Pylance",
     // Autocomplete from ros python packages
     "python.autoComplete.extraPaths": [
         "/opt/ros/humble/lib/python3.10/site-packages/"

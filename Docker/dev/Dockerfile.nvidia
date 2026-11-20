@@ -66,6 +66,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         tmux \
         usbutils \
         v4l-utils \
+        # OpenVINS dependencies
+        libceres-dev \
+        libgoogle-glog-dev \
         # GUI Support (RQT/Rviz)
         libgl1 \
         libglx-mesa0 \

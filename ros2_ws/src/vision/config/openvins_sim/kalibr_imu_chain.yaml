@@ -1,0 +1,41 @@
+%YAML:1.0
+
+# IMU of the Unity sim (auv-sim-unity IMUPublisher), 100 Hz, FLU body frame, reports specific force.
+# In the recorded bag the sim IMU is noise-free (IMU noise toggle off), so these are small EuRoC-like values.
+# If IMU noise is enabled in the sim (accelNoise 0.1, gyroNoise 0.05 per sample at 100 Hz) raise them to
+# roughly 1e-2, 1.6e-3, 5e-3, 1.4e-3 and expect worse scale accuracy.
+imu0:
+  T_i_b:
+    - [1.0, 0.0, 0.0, 0.0]
+    - [0.0, 1.0, 0.0, 0.0]
+    - [0.0, 0.0, 1.0, 0.0]
+    - [0.0, 0.0, 0.0, 1.0]
+  accelerometer_noise_density: 2.0e-3
+  accelerometer_random_walk: 3.0e-4
+  gyroscope_noise_density: 1.7e-4
+  gyroscope_random_walk: 2.0e-5
+  # /imu/data re-timed by openvins_sim_adapter.py (no trailing comment on the rostopic line: the parser reads it into the name)
+  rostopic: /openvins/imu
+  time_offset: 0.0
+  update_rate: 100.0
+  model: "kalibr"
+  Tw:
+    - [ 1.0, 0.0, 0.0 ]
+    - [ 0.0, 1.0, 0.0 ]
+    - [ 0.0, 0.0, 1.0 ]
+  R_IMUtoGYRO:
+    - [ 1.0, 0.0, 0.0 ]
+    - [ 0.0, 1.0, 0.0 ]
+    - [ 0.0, 0.0, 1.0 ]
+  Ta:
+    - [ 1.0, 0.0, 0.0 ]
+    - [ 0.0, 1.0, 0.0 ]
+    - [ 0.0, 0.0, 1.0 ]
+  R_IMUtoACC:
+    - [ 1.0, 0.0, 0.0 ]
+    - [ 0.0, 1.0, 0.0 ]
+    - [ 0.0, 0.0, 1.0 ]
+  Tg:
+    - [ 0.0, 0.0, 0.0 ]
+    - [ 0.0, 0.0, 0.0 ]
+    - [ 0.0, 0.0, 0.0 ]
