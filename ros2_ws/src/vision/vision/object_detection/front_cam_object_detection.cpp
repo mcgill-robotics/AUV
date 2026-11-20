@@ -101,11 +101,17 @@ cv::Mat depth_to_mm(const cv::Mat& depth) {
 // Map a parameter string (e.g. "HD720", "NEURAL", "GEN_3") onto a ZED enum via sl::toString.
 template <typename E>
 E zed_enum_from_name(const std::string& raw_name, const std::string& param_name) {
-    const std::string name = upper(raw_name);
+    // sl::toString spells some values with spaces ("GEN 3") while the yaml uses the enum spelling ("GEN_3").
+    const auto normalize = [](std::string s) {
+        s = upper(s);
+        std::replace_if(s.begin(), s.end(), [](char c) { return c == ' ' || c == '-'; }, '_');
+        return s;
+    };
+    const std::string name = normalize(raw_name);
     std::string valid;
     for (int i = 0; i < static_cast<int>(E::LAST); ++i) {
         const auto value = static_cast<E>(i);
-        const std::string candidate = upper(sl::toString(value).c_str());
+        const std::string candidate = normalize(sl::toString(value).c_str());
         if (candidate == name) return value;
         valid += (valid.empty() ? "" : ", ") + candidate;
     }
