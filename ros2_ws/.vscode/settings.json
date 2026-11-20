@@ -1,0 +1,36 @@
+{
+    "python.autoComplete.extraPaths": [
+        "/home/douglas/AUV/ros2_ws/install/planner/lib/python3.12/site-packages",
+        "/home/douglas/AUV/ros2_ws/install/controls/lib/python3.12/site-packages",
+        "/home/douglas/AUV/ros2_ws/install/sensors/lib/python3.12/site-packages",
+        "/home/douglas/AUV/ros2_ws/install/xsens_mti_ros2_driver/lib/python3.12/site-packages",
+        "/home/douglas/AUV/ros2_ws/install/vision/lib/python3.12/site-packages",
+        "/home/douglas/AUV/ros2_ws/install/teleop/lib/python3.12/site-packages",
+        "/home/douglas/AUV/ros2_ws/install/telemetry/lib/python3.12/site-packages",
+        "/home/douglas/AUV/ros2_ws/install/ros_tcp_endpoint/lib/python3.12/site-packages",
+        "/home/douglas/AUV/ros2_ws/install/propulsion/lib/python3.12/site-packages",
+        "/home/douglas/AUV/ros2_ws/install/dvl_a50_serial_python/lib/python3.12/site-packages",
+        "/home/douglas/AUV/ros2_ws/install/dvl_msgs/lib/python3.12/site-packages",
+        "/home/douglas/AUV/ros2_ws/install/auv_msgs/lib/python3.12/site-packages",
+        "/opt/ros/micro_ros_ws/install/lib/python3.12/site-packages",
+        "/opt/ros/jazzy/opt/gz_math_vendor/lib/python",
+        "/opt/ros/jazzy/lib/python3.12/site-packages"
+    ],
+    "python.analysis.extraPaths": [
+        "/home/douglas/AUV/ros2_ws/install/planner/lib/python3.12/site-packages",
+        "/home/douglas/AUV/ros2_ws/install/controls/lib/python3.12/site-packages",
+        "/home/douglas/AUV/ros2_ws/install/sensors/lib/python3.12/site-packages",
+        "/home/douglas/AUV/ros2_ws/install/xsens_mti_ros2_driver/lib/python3.12/site-packages",
+        "/home/douglas/AUV/ros2_ws/install/vision/lib/python3.12/site-packages",
+        "/home/douglas/AUV/ros2_ws/install/teleop/lib/python3.12/site-packages",
+        "/home/douglas/AUV/ros2_ws/install/telemetry/lib/python3.12/site-packages",
+        "/home/douglas/AUV/ros2_ws/install/ros_tcp_endpoint/lib/python3.12/site-packages",
+        "/home/douglas/AUV/ros2_ws/install/propulsion/lib/python3.12/site-packages",
+        "/home/douglas/AUV/ros2_ws/install/dvl_a50_serial_python/lib/python3.12/site-packages",
+        "/home/douglas/AUV/ros2_ws/install/dvl_msgs/lib/python3.12/site-packages",
+        "/home/douglas/AUV/ros2_ws/install/auv_msgs/lib/python3.12/site-packages",
+        "/opt/ros/micro_ros_ws/install/lib/python3.12/site-packages",
+        "/opt/ros/jazzy/opt/gz_math_vendor/lib/python",
+        "/opt/ros/jazzy/lib/python3.12/site-packages"
+    ]
+}

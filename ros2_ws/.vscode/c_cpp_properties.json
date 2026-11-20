@@ -1,0 +1,35 @@
+{
+  "configurations": [
+    {
+      "browse": {
+        "databaseFilename": "${default}",
+        "limitSymbolsToIncludedHeaders": false
+      },
+      "includePath": [
+        "/home/douglas/AUV/ros2_ws/install/controls/include/**",
+        "/home/douglas/AUV/ros2_ws/install/sensors/include/**",
+        "/home/douglas/AUV/ros2_ws/install/xsens_mti_ros2_driver/include/**",
+        "/home/douglas/AUV/ros2_ws/install/vision/include/**",
+        "/home/douglas/AUV/ros2_ws/install/ntrip/include/**",
+        "/home/douglas/AUV/ros2_ws/install/dvl_a50/include/**",
+        "/home/douglas/AUV/ros2_ws/install/dvl_msgs/include/**",
+        "/home/douglas/AUV/ros2_ws/install/auv_msgs/include/**",
+        "/opt/ros/micro_ros_ws/install/include/**",
+        "/opt/ros/jazzy/include/**",
+        "/home/douglas/AUV/ros2_ws/src/Xsens_MTi_Driver/src/ntrip/include/**",
+        "/home/douglas/AUV/ros2_ws/src/Xsens_MTi_Driver/src/xsens_mti_ros2_driver/include/**",
+        "/home/douglas/AUV/ros2_ws/src/controls/include/**",
+        "/home/douglas/AUV/ros2_ws/src/dvl_a50/include/**",
+        "/home/douglas/AUV/ros2_ws/src/sensors/include/**",
+        "/home/douglas/AUV/ros2_ws/src/vision/include/**",
+        "/usr/include/**"
+      ],
+      "name": "ROS",
+      "intelliSenseMode": "gcc-x64",
+      "compilerPath": "/usr/bin/gcc",
+      "cStandard": "gnu11",
+      "cppStandard": "c++14"
+    }
+  ],
+  "version": 4
+}
