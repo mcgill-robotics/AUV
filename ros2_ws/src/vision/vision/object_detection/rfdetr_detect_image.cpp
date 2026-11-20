@@ -32,7 +32,11 @@ int main(int argc, char** argv) {
 
     vision::RfDetrEngineOptions opts;
     opts.model_dir = model_dir;
-    opts.engine_builder = fs::canonical("/proc/self/exe").parent_path() / "rfdetr_build";
+    // Look next to the invoked path first: with --symlink-install, /proc/self/exe resolves into build/.
+    opts.engine_builder = fs::absolute(argv[0]).parent_path() / "rfdetr_build";
+    if (!fs::exists(opts.engine_builder)) {
+        opts.engine_builder = fs::canonical("/proc/self/exe").parent_path() / "rfdetr_build";
+    }
     opts.log_info = [](const std::string& msg) { std::cout << msg << "\n"; };
     vision::RfDetrEngine engine(opts);
 
