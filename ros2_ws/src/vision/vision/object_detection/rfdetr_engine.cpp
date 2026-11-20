@@ -55,6 +55,11 @@ struct RfDetrEngine::Impl {
     rfdetr::PostprocessParams pp;
     std::vector<float> h_dets;
     std::vector<float> h_labels;
+    // Segmentation models only (third "masks" output, [1, queries, mask_h, mask_w] logits).
+    std::string masks_name;
+    int mask_h = 0;
+    int mask_w = 0;
+    std::vector<float> h_masks;
 
     Impl(const fs::path& engine_path, int background_class_index) : session(engine_path) {
         const auto* in = session.find(input_name);
@@ -78,12 +83,25 @@ struct RfDetrEngine::Impl {
         dets_name = dets->name;
         labels_name = labels->name;
 
+        const auto* masks = session.find("masks");
+        if (masks == nullptr && session.output_indices().size() >= 3) {
+            masks = &session.bindings()[session.output_indices()[2]];
+        }
+        if (masks != nullptr && masks->shape.nbDims >= 4) {
+            masks_name = masks->name;
+            mask_h = static_cast<int>(masks->shape.d[masks->shape.nbDims - 2]);
+            mask_w = static_cast<int>(masks->shape.d[masks->shape.nbDims - 1]);
+        }
+
         pp.num_queries = static_cast<int>(dets->shape.d[dets->shape.nbDims - 2]);
         pp.num_classes_with_bg = static_cast<int>(labels->shape.d[labels->shape.nbDims - 1]);
         pp.topk = pp.num_queries;
         pp.bg_class_index = background_class_index;
         h_dets.resize(static_cast<std::size_t>(pp.num_queries) * 4);
         h_labels.resize(static_cast<std::size_t>(pp.num_queries) * pp.num_classes_with_bg);
+        if (!masks_name.empty()) {
+            h_masks.resize(static_cast<std::size_t>(pp.num_queries) * mask_h * mask_w);
+        }
 
         // ImageNet mean/std (defaults) match our models' inference_config.json.
         preprocessor = std::make_unique<rfdetr::ImagePreprocessor>(input_size, /*src_is_bgr=*/true);
@@ -105,6 +123,8 @@ RfDetrEngine::~RfDetrEngine() = default;
 
 int RfDetrEngine::input_size() const { return impl_->input_size; }
 
+bool RfDetrEngine::has_masks() const { return !impl_->masks_name.empty(); }
+
 std::vector<Detection2D> RfDetrEngine::detect(const cv::Mat& image, float threshold) {
     if (image.empty() || image.type() != CV_8UC3) {
         throw std::invalid_argument("RfDetrEngine::detect expects a non-empty CV_8UC3 BGR image");
@@ -117,13 +137,20 @@ std::vector<Detection2D> RfDetrEngine::detect(const cv::Mat& image, float thresh
     s.get_output_f32(impl_->labels_name, impl_->h_labels.data(), impl_->h_labels.size());
 
     impl_->pp.threshold = threshold;
-    const rfdetr::Detections raw = rfdetr::decode_detections(
-        impl_->h_dets.data(), impl_->h_labels.data(), image.cols, image.rows, impl_->pp);
+    std::vector<int> query_idx;
+    rfdetr::Detections raw = rfdetr::decode_detections_with_queries(
+        impl_->h_dets.data(), impl_->h_labels.data(), image.cols, image.rows, impl_->pp, query_idx);
+    if (has_masks()) {
+        // Full-resolution CV_8UC1 masks (0/255), upsampled and thresholded on the GPU.
+        s.get_output_f32(impl_->masks_name, impl_->h_masks.data(), impl_->h_masks.size());
+        rfdetr::decode_masks(impl_->h_masks.data(), impl_->mask_h, impl_->mask_w, query_idx, image.cols, image.rows,
+                             raw, s.stream());
+    }
 
     std::vector<Detection2D> out;
     out.reserve(raw.size());
-    for (const auto& d : raw) {
-        out.push_back({{d.box.x1, d.box.y1, d.box.x2, d.box.y2}, d.class_id, d.score});
+    for (auto& d : raw) {
+        out.push_back({{d.box.x1, d.box.y1, d.box.x2, d.box.y2}, d.class_id, d.score, std::move(d.mask)});
     }
     return out;
 }

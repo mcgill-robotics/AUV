@@ -69,6 +69,7 @@ Here is the general formula for a standard pinhole camera model based on the len
 | `down_model_relative_path` | `string` | `models/template_yolo` | Path to down camera model package relative to vision package |
 | `enable_object_detection` | `bool` | `true` | Enable object detection inference globally |
 | `has_zed_sdk` | `bool` | `true` | Whether the ZED SDK is available (set `false` for non-ZED hardware) |
+| `down_cam_cpp` | `bool` | `true` | Run the C++ down camera node; `false` uses the Python one. Ignored (Python) when the C++ node is not built |
 
 Example overrides:
 
@@ -160,10 +161,12 @@ Thus, detections are kept in the camera frame world-frame conversion to `object_
 
 ### Down Camera Detection Node
 
-The down camera node is currently a simpler 2D detection node without depth or pose synchronization. It:
-- subscribes to the down camera RGB feed
-- runs model inference to get 2D detections
-- Publishes a `vision_msgs/Detection2DArray`
+The down camera node (C++ by default, Python still available with `down_cam_cpp:=false`, see [C++ Down Camera Node](#c-down-camera-node)):
+- grabs the USB down camera directly (V4L2), or subscribes to `image_topic` in sim
+- runs an RF-DETR **segmentation** model: each detection comes with a mask
+- uses the mask centroid as the object position in the image, and the mask's min-area rectangle for its in-plane yaw (skipped when the box touches the image border)
+- projects the centroid onto the pool floor, or `pool_floor_z + down_cam_projection_heights[label]` (e.g. table top), using `state/pose` and Snell's law
+- publishes a `VisionDetectionFrame` on `/vision/down_cam/detection_frame`, consumed by `object_map`
 
 ### Object Map Node
 
@@ -337,6 +340,22 @@ models/<model_dir>/rfdetr_cpp_fp16.engine.json
 - Like `engine.plan`, it is device-specific and ignored by git.
 
 To build it ahead of time (for example before a short sim run), run the test tool once on any image, see below.
+
+### C++ Down Camera Node
+
+`down_cam_object_detection` ([down_cam_object_detection.cpp](vision/object_detection/down_cam_object_detection.cpp)) is the C++ port of [down_cam_object_detection_node.py](vision/object_detection/down_cam_object_detection_node.py), with the same parameters, topics and services (`toggle_collection`, `toggle_annotated_image`, `get_camera_settings`, `set_projection_heights`).
+
+- Uses the same `RfDetrEngine` as the front camera. When the engine has a third `masks` output, masks are upsampled to full resolution and thresholded on the GPU.
+- Mask centroid, yaw, floor projection and orientation quaternion live in [detection_geometry.cpp](vision/object_detection/detection_geometry.cpp) and are unit-tested against the Python implementation.
+- Camera controls (`brightness`, `auto_exposure`, ...) are applied at startup and can be changed live with `ros2 param set`, through OpenCV or `v4l2-ctl` like the Python node.
+- If the model folder only has the weights placeholder, the node publishes the raw feed without detections (same as Python).
+
+The Python node is kept until the C++ one has been validated in the pool. To switch back: `ros2 launch vision vision_pipeline.launch.py down_cam_cpp:=false`.
+
+Test on one image (no camera), like the front model:
+```bash
+./install/vision/lib/vision/rfdetr_detect_image install/vision/share/vision/models/real_down_cam_rfdetr_seg_onnx <image.jpg>
+```
 
 ### Testing Without The Robot
 

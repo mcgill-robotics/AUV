@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <cmath>
 
+#include <opencv2/imgproc.hpp>
+
 namespace vision {
 
 namespace {
@@ -256,6 +258,69 @@ std::optional<Position3D> compute_3d_position(const Compute3DInput& in, const De
     cov += Eigen::Matrix3d::Identity() * dynamic_noise;
 
     return Position3D{*cam_pos, cov};
+}
+
+DownCamMaskGeometry analyze_down_cam_mask(const cv::Mat& mask, const BBoxXYXY& bbox, int img_w, int img_h,
+                                          int border_margin) {
+    DownCamMaskGeometry out;
+    out.center_x = (bbox.x1 + bbox.x2) / 2.0;
+    out.center_y = (bbox.y1 + bbox.y2) / 2.0;
+    const auto x1 = static_cast<float>(bbox.x1), y1 = static_cast<float>(bbox.y1);
+    const auto x2 = static_cast<float>(bbox.x2), y2 = static_cast<float>(bbox.y2);
+    out.box = {cv::Point2f(x1, y1), cv::Point2f(x2, y1), cv::Point2f(x2, y2), cv::Point2f(x1, y2)};
+    if (mask.empty()) return out;
+
+    const cv::Moments m = cv::moments(mask, /*binaryImage=*/true);
+    if (m.m00 != 0.0) {
+        out.center_x = m.m10 / m.m00;
+        out.center_y = m.m01 / m.m00;
+    }
+
+    std::vector<std::vector<cv::Point>> contours;
+    cv::findContours(mask, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
+    if (contours.empty()) return out;
+    // First largest, like Python's max(contours, key=cv2.contourArea).
+    const auto& c = *std::max_element(contours.begin(), contours.end(), [](const auto& a, const auto& b) {
+        return cv::contourArea(a) < cv::contourArea(b);
+    });
+    if (c.size() < 5) return out;
+
+    cv::Point2f pts[4];
+    cv::minAreaRect(c).points(pts);
+    std::copy(std::begin(pts), std::end(pts), out.box.begin());
+
+    const double margin = border_margin;
+    const bool touches_border = bbox.x1 <= margin || bbox.y1 <= margin || bbox.x2 >= img_w - margin
+                                || bbox.y2 >= img_h - margin;
+    if (touches_border) return out;
+
+    const cv::Point2f e1 = pts[1] - pts[0];
+    const cv::Point2f e2 = pts[2] - pts[1];
+    const cv::Point2f long_side = cv::norm(e1) > cv::norm(e2) ? e1 : e2;
+    out.yaw = std::atan2(long_side.y, long_side.x);
+    return out;
+}
+
+std::optional<Eigen::Vector3d> project_down_cam_to_plane(double u, double v, const CameraIntrinsics& K, double n_w,
+                                                         const Eigen::Matrix4d& T_world_camera, double target_z) {
+    // Down camera frame: X along the optical axis (down in the world), Y left, Z up in the image.
+    const auto [x_ray, y_ray] = apply_snells_law_lateral(1.0, u - K.cx, v - K.cy, K.fx, K.fy, n_w);
+    const Eigen::Vector4d v_c(1.0, -x_ray, -y_ray, 0.0);
+    const Eigen::Vector4d v_w = T_world_camera * v_c;
+    const double origin_z = T_world_camera(2, 3);
+
+    if (std::abs(v_w.z()) < 1e-6) return std::nullopt;
+    const double t = (target_z - origin_z) / v_w.z();
+    if (t <= 0.0) return std::nullopt;
+    return Eigen::Vector3d(t * v_c.head<3>());
+}
+
+Eigen::Quaterniond down_cam_orientation_from_yaw(double yaw) {
+    // A flat object facing forward is Ry(-90deg) in the down camera frame; an image-plane rotation is a
+    // rotation about the camera X axis. Same as quaternion_multiply(q_rot, q_base) in the Python node.
+    const Eigen::Quaterniond q_rot(Eigen::AngleAxisd(M_PI / 2.0 + yaw, Eigen::Vector3d::UnitX()));
+    const Eigen::Quaterniond q_base(Eigen::AngleAxisd(-M_PI / 2.0, Eigen::Vector3d::UnitY()));
+    return q_rot * q_base;
 }
 
 }  // namespace vision

@@ -20,6 +20,8 @@ struct Detection2D {
     BBoxXYXY bbox;  // pixels in the input image
     int class_id = -1;
     float score = 0.0f;
+    // Segmentation models only: CV_8UC1 mask (0/255) the size of the input image. Empty otherwise.
+    cv::Mat mask;
 };
 
 struct RfDetrEngineOptions {
@@ -46,6 +48,8 @@ public:
     std::vector<Detection2D> detect(const cv::Mat& image, float threshold);
 
     int input_size() const;
+    // True when the engine has a "masks" output (RF-DETR segmentation export).
+    bool has_masks() const;
 
 private:
     struct Impl;

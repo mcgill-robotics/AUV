@@ -7,6 +7,8 @@
 #include <cmath>
 #include <limits>
 
+#include <opencv2/imgproc.hpp>
+
 #include "detection_geometry.hpp"
 
 using namespace vision;
@@ -207,4 +209,79 @@ TEST(Compute3D, ZedFallbackAndInvalidPoints) {
     EXPECT_FALSE(compute_3d_position(in, make_config(), kK, kRefraction).has_value());
     in.zed_object->position = Eigen::Vector3d(-1.0, 0.0, 0.0);
     EXPECT_FALSE(compute_3d_position(in, make_config(), kK, kRefraction).has_value());
+}
+
+// ---------------------------------------------------------------------------
+// Down camera. Golden values from the Python DownCamObjectDetectorNode logic
+// (cv2 4.11 moments / findContours / minAreaRect, tf_transformations quaternions).
+// ---------------------------------------------------------------------------
+
+namespace {
+
+cv::Mat rotated_rect_mask() {
+    cv::Mat mask = cv::Mat::zeros(480, 640, CV_8UC1);
+    const std::vector<cv::Point> poly = {{200, 150}, {420, 230}, {390, 310}, {170, 230}};
+    cv::fillPoly(mask, std::vector<std::vector<cv::Point>>{poly}, cv::Scalar(255));
+    return mask;
+}
+
+}  // namespace
+
+TEST(DownCamMask, CentroidAndYawMatchPython) {
+    const auto g = analyze_down_cam_mask(rotated_rect_mask(), {170, 150, 420, 310}, 640, 480, 10);
+    EXPECT_NEAR(g.center_x, 294.9455691837841, 1e-6);
+    EXPECT_NEAR(g.center_y, 229.9802965371164, 1e-6);
+    ASSERT_TRUE(g.yaw.has_value());
+    EXPECT_NEAR(*g.yaw, 0.3487709869922537, 1e-6);
+}
+
+TEST(DownCamMask, NoYawWhenTouchingBorderOrWithoutMask) {
+    const auto border = analyze_down_cam_mask(rotated_rect_mask(), {5, 150, 420, 310}, 640, 480, 10);
+    EXPECT_NEAR(border.center_x, 294.9455691837841, 1e-6);
+    EXPECT_FALSE(border.yaw.has_value());
+
+    const auto no_mask = analyze_down_cam_mask(cv::Mat(), {100, 100, 200, 140}, 640, 480, 10);
+    EXPECT_DOUBLE_EQ(no_mask.center_x, 150.0);
+    EXPECT_DOUBLE_EQ(no_mask.center_y, 120.0);
+    EXPECT_FALSE(no_mask.yaw.has_value());
+    EXPECT_FLOAT_EQ(no_mask.box[2].x, 200.0f);
+}
+
+TEST(DownCamProjection, MatchesPython) {
+    const CameraIntrinsics K{692.8, 692.8, 320.0, 240.0};
+    Eigen::Matrix4d T;
+    T << -0.014980912390756801, -0.7175040505719174, 0.6963932148411786, 2.9029066382920936,
+        0.05631138611640302, 0.6947605828651856, 0.717033304868384, -1.4986196312200568,
+        -0.9983008564844517, 0.04995668033125288, 0.029995500207383924, -0.8124889428811639,
+        0.0, 0.0, 0.0, 1.0;
+
+    const auto table = project_down_cam_to_plane(410.0, 300.0, K, 1.333, T, -2.1 + 0.67);
+    ASSERT_TRUE(table.has_value());
+    EXPECT_NEAR(table->x(), 0.6143886377294329, 1e-9);
+    EXPECT_NEAR(table->y(), -0.05955875132322846, 1e-9);
+    EXPECT_NEAR(table->z(), -0.03970583421548563, 1e-9);
+
+    const auto floor = project_down_cam_to_plane(100.0, 50.0, K, 1.333, T, -2.1);
+    ASSERT_TRUE(floor.has_value());
+    EXPECT_NEAR(floor->x(), 1.3125993404469836, 1e-9);
+    EXPECT_NEAR(floor->y(), 0.3013105811106241, 1e-9);
+    EXPECT_NEAR(floor->z(), 0.260222774595539, 1e-9);
+
+    // Plane above the camera: intersection is behind it.
+    EXPECT_FALSE(project_down_cam_to_plane(320.0, 240.0, K, 1.333, T, 0.5).has_value());
+}
+
+TEST(DownCamOrientation, MatchesPythonQuaternionMultiply) {
+    const struct { double yaw, x, y, z, w; } cases[] = {
+        {0.0, 0.5, -0.5, -0.4999999999999999, 0.5000000000000001},
+        {0.6, 0.6254283478934728, -0.3299081412321332, -0.6254283478934727, 0.32990814123213325},
+        {-2.3, -0.2521382496881819, -0.6606256905723391, 0.2521382496881818, 0.6606256905723392},
+    };
+    for (const auto& c : cases) {
+        const auto q = down_cam_orientation_from_yaw(c.yaw);
+        EXPECT_NEAR(q.x(), c.x, 1e-12) << c.yaw;
+        EXPECT_NEAR(q.y(), c.y, 1e-12) << c.yaw;
+        EXPECT_NEAR(q.z(), c.z, 1e-12) << c.yaw;
+        EXPECT_NEAR(q.w(), c.w, 1e-12) << c.yaw;
+    }
 }

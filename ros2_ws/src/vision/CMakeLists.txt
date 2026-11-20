@@ -133,6 +133,18 @@ if(CMAKE_CUDA_COMPILER AND TensorRT_FOUND)
   else()
     message(STATUS "vision: ZED SDK not found, front_cam_object_detection supports has_zed_sdk:=false only")
   endif()
+  # Down camera node: USB camera through OpenCV/V4L2, no ZED.
+  add_executable(down_cam_object_detection
+      ${PROJECT_NAME}/down_cam_object_detection_main.cpp
+      ${PROJECT_NAME}/object_detection/down_cam_object_detection.cpp
+  )
+  target_include_directories(down_cam_object_detection PRIVATE
+      ${CMAKE_CURRENT_SOURCE_DIR}/include
+      ${CMAKE_CURRENT_SOURCE_DIR}/include/${PROJECT_NAME}
+  )
+  target_link_libraries(down_cam_object_detection rfdetr_engine_lib detection_geometry_lib)
+  ament_target_dependencies(down_cam_object_detection ${ROS_DEPS} ${CPP_LIBS} cv_bridge ament_index_cpp)
+
   message(STATUS "vision: RF-DETR C++ detection enabled (CUDA archs: ${CMAKE_CUDA_ARCHITECTURES})")
 else()
   set(VISION_HAS_RFDETR OFF)
@@ -172,7 +184,8 @@ if(VISION_HAS_RFDETR)
   install(TARGETS rfdetr_engine_lib
       LIBRARY DESTINATION lib
   )
-  install(TARGETS rfdetr_build rfdetr_detect_image front_cam_object_detection DESTINATION lib/${PROJECT_NAME})
+  install(TARGETS rfdetr_build rfdetr_detect_image front_cam_object_detection down_cam_object_detection
+      DESTINATION lib/${PROJECT_NAME})
 endif()
 # Object Map node executable
 install(TARGETS object_map 

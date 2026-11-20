@@ -53,7 +53,14 @@ int main(int argc, char** argv) {
                                       ? class_names[d.class_id]
                                       : "class_" + std::to_string(d.class_id);
         std::cout << "  " << label << " " << d.score << " [" << d.bbox.x1 << ", " << d.bbox.y1 << ", "
-                  << d.bbox.x2 << ", " << d.bbox.y2 << "]\n";
+                  << d.bbox.x2 << ", " << d.bbox.y2 << "]";
+        if (!d.mask.empty()) {
+            std::cout << " mask " << cv::countNonZero(d.mask) << " px";
+            cv::Mat overlay = image.clone();
+            overlay.setTo(cv::Scalar(0, 255, 0), d.mask);
+            cv::addWeighted(overlay, 0.4, image, 0.6, 0.0, image);
+        }
+        std::cout << "\n";
 
         const cv::Point tl(static_cast<int>(d.bbox.x1), static_cast<int>(d.bbox.y1));
         const cv::Point br(static_cast<int>(d.bbox.x2), static_cast<int>(d.bbox.y2));

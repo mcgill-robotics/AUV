@@ -68,6 +68,12 @@ def generate_launch_description():
         description="Optional override path to the down camera object detection model relative to vision package."
     )
 
+    down_cam_cpp_arg = DeclareLaunchArgument(
+        "down_cam_cpp",
+        default_value="true",
+        description="Run the C++ down camera node (needs CUDA + TensorRT). Set false to use the Python node."
+    )
+
     enable_object_detection_arg = DeclareLaunchArgument(
         "enable_object_detection",
         default_value="true",
@@ -260,9 +266,18 @@ def generate_launch_description():
     )
 
     
+    # The C++ down camera node is only built with CUDA + TensorRT; otherwise always use the Python node.
+    down_cam_cpp_available = os.path.exists(
+        os.path.join(get_package_prefix("vision"), "lib", "vision", "down_cam_object_detection")
+    )
+    down_detection_executable = PythonExpression([
+        "'down_cam_object_detection' if '", LaunchConfiguration("down_cam_cpp"), "' == 'true' and ",
+        str(down_cam_cpp_available), " else 'down_cam_object_detection.py'"
+    ])
+
     down_detection_node = Node(
         package='vision',
-        executable='down_cam_object_detection.py',
+        executable=down_detection_executable,
         name='down_cam_object_detection',
         parameters=[
             config_path,
@@ -314,6 +329,7 @@ def generate_launch_description():
     launch_description.add_action(use_enhance_arg)
     launch_description.add_action(front_model_arg)
     launch_description.add_action(down_model_arg)
+    launch_description.add_action(down_cam_cpp_arg)
     launch_description.add_action(enable_object_detection_arg)
     launch_description.add_action(has_zed_sdk_arg)
     

@@ -99,4 +99,32 @@ struct Compute3DInput {
 std::optional<Position3D> compute_3d_position(const Compute3DInput& in, const DepthEstimationConfig& cfg,
                                               const CameraIntrinsics& K, const RefractionParams& refraction);
 
+// ---------------------------------------------------------------------------
+// Down camera (port of the Python DownCamObjectDetectorNode)
+// ---------------------------------------------------------------------------
+
+struct DownCamMaskGeometry {
+    // Mask centroid, or the bbox centre when there is no usable mask.
+    double center_x = 0.0;
+    double center_y = 0.0;
+    // Image-plane angle (rad) of the long side of the mask's min-area rectangle.
+    // Unset without a usable mask or when the bbox touches the image border (object partly visible).
+    std::optional<double> yaw;
+    // Oriented box corners for drawing: the min-area rectangle, or the axis-aligned bbox.
+    std::array<cv::Point2f, 4> box;
+};
+
+// `mask` is CV_8UC1 (any non-zero = object), same size as the image, or empty for detection-only models.
+DownCamMaskGeometry analyze_down_cam_mask(const cv::Mat& mask, const BBoxXYXY& bbox, int img_w, int img_h,
+                                          int border_margin);
+
+// Intersects the (Snell-corrected) ray through pixel (u, v) with the horizontal plane z = target_z in the
+// world frame. T_world_camera maps the down camera frame (X along the optical axis) to the world.
+// Returns the hit point in the camera frame, or nothing when the ray is horizontal or the plane is behind.
+std::optional<Eigen::Vector3d> project_down_cam_to_plane(double u, double v, const CameraIntrinsics& K, double n_w,
+                                                         const Eigen::Matrix4d& T_world_camera, double target_z);
+
+// Orientation, in the down camera frame, of an object lying flat with image-plane angle `yaw`.
+Eigen::Quaterniond down_cam_orientation_from_yaw(double yaw);
+
 }  // namespace vision
