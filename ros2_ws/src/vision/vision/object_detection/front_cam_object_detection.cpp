@@ -725,7 +725,12 @@ void FrontCamObjectDetectionNode::grab_loop() {
             std::lock_guard<std::mutex> lock(collection_mutex_);
             is_collection_frame = collecting_ && (wall_time_sec() - last_collection_time_) >= collection_interval_;
         }
-        process_frame(img, stamp, &depth, vio_pose, is_collection_frame, t_start);
+        try {
+            process_frame(img, stamp, &depth, vio_pose, is_collection_frame, t_start);
+        } catch (const std::exception& e) {
+            // An exception escaping this thread would std::terminate the whole node; drop the frame instead.
+            RCLCPP_ERROR_THROTTLE(get_logger(), *get_clock(), kWarnThrottleMs, "Frame processing failed: %s", e.what());
+        }
     }
 #endif
 }
@@ -1059,8 +1064,13 @@ void FrontCamObjectDetectionNode::publish_depth(const cv::Mat& depth, const buil
     header.stamp = stamp;
     header.frame_id = image_frame_id_;
     if (pub_depth_compressed_) {
-        cv_bridge::CvImage cv_img(header, "16UC1", depth_to_mm(depth));
-        pub_depth_compressed_->publish(*cv_img.toCompressedImageMsg(cv_bridge::PNG));
+        // Encoded by hand: cv_bridge's C++ toCompressedImageMsg rejects mono16 input. Same output as Python's
+        // cv2_to_compressed_imgmsg(depth_mm, dst_format='png').
+        sensor_msgs::msg::CompressedImage msg;
+        msg.header = header;
+        msg.format = "png";
+        cv::imencode(".png", depth_to_mm(depth), msg.data);
+        pub_depth_compressed_->publish(msg);
     } else if (pub_depth_raw_) {
         cv_bridge::CvImage cv_img(header, "32FC1", depth);
         pub_depth_raw_->publish(*cv_img.toImageMsg());
