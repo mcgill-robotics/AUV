@@ -1,7 +1,7 @@
 #pragma once
 
 // Camera-frame 3D localisation of 2D detections, ported from
-// vision/object_detection/utils.py and FrontCamObjectDetectorNode._compute_3d_position.
+// vision/object_detection/utils.py and the former Python FrontCamObjectDetectorNode._compute_3d_position.
 // Kept free of ROS / CUDA / ZED so it builds and is unit-tested on every machine.
 
 #include <array>

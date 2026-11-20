@@ -1,5 +1,5 @@
-// Parity tests for detection_geometry against the Python implementation in
-// vision/object_detection/utils.py. Golden values were produced by running the
+// Parity tests for detection_geometry against the Python implementation that lived in
+// vision/object_detection/utils.py and the Python front cam node. Golden values were produced by running the
 // original Python functions (and numpy.median / numpy.percentile / numpy.var).
 
 #include <gtest/gtest.h>
