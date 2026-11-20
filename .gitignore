@@ -88,5 +88,3 @@ core.*
 rosbags/**/*.yaml
 *.zip
 .isaac-ros-cli/
-# rf-detr-cpp TensorRT engines (built on the target GPU)
-*.engine
