@@ -74,7 +74,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # TensorRT (from the NVIDIA CUDA apt repo of the base image), same packages as the Jetson image.
 # Needed to build the C++ RF-DETR detection nodes in the vision package.
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# Pinned to TensorRT 10 built for this image's CUDA: TensorRT 11 drops APIs rf-detr-cpp still uses and
+# pulls a newer CUDA runtime than the base image.
+RUN printf 'Package: tensorrt* libnvinfer* libnvonnxparsers* python3-libnvinfer*\nPin: version 10.*+cuda%s.%s\nPin-Priority: 1001\n' \
+        "${CUDA_MAJOR}" "${CUDA_MINOR}" > /etc/apt/preferences.d/tensorrt && \
+        apt-get update && apt-get install -y --no-install-recommends \
         tensorrt-dev \
         && rm -rf /var/lib/apt/lists/*
 
