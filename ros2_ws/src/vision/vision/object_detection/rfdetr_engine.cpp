@@ -22,11 +22,12 @@ bool engine_is_stale(const fs::path& onnx, const fs::path& engine) {
 
 fs::path ensure_engine(const RfDetrEngineOptions& opts) {
     const fs::path onnx = opts.model_dir / "weights.onnx";
-    const fs::path engine = opts.model_dir / "engine.plan";
+    // Own file name: the Python inference_models backend writes its own engine.plan in the same folder.
+    const fs::path engine = opts.model_dir / ("rfdetr_cpp_" + opts.precision + ".engine");
 
     if (!engine_is_stale(onnx, engine)) return engine;
     if (!fs::exists(onnx)) {
-        throw std::runtime_error("No engine.plan or weights.onnx in " + opts.model_dir.string());
+        throw std::runtime_error("No " + engine.filename().string() + " or weights.onnx in " + opts.model_dir.string());
     }
     if (!fs::exists(opts.engine_builder)) {
         throw std::runtime_error("Engine builder not found: " + opts.engine_builder.string());
