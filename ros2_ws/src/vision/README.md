@@ -5,6 +5,7 @@ This package contains the front-camera detection pipeline, the persistent 3D obj
 Key files:
 - [vision_pipeline.launch.py](launch/vision_pipeline.launch.py)
 - [front_cam_object_detection_node.py](vision/object_detection/front_cam_object_detection_node.py)
+- [front_cam_object_detection.cpp](vision/object_detection/front_cam_object_detection.cpp) (C++ port, see [C++ Front Camera Node](#c-front-camera-node-rf-detr--tensorrt))
 - [object_map.cpp](vision/object_map.cpp)
 - [object_tracker.cpp](vision/object_map/object_tracker.cpp)
 
@@ -277,6 +278,127 @@ Behavior:
 
 This keeps Foxglove simple because you do not need to switch image topics to compare raw vs annotated output.
 
+## C++ Front Camera Node (RF-DETR + TensorRT)
+
+`front_cam_object_detection` also exists as a native C++ node. It is a port of the Python node: same parameters (same yaml block), same topics, services and messages, so `object_map` and the rest of the stack do not see a difference. Inference runs on TensorRT through [rf-detr-cpp](https://github.com/infracv/rf-detr-cpp) (git submodule under `external/rf-detr-cpp`) instead of Roboflow `inference-models` + PyTorch.
+
+### How It Works
+
+Files:
+
+| File | Role |
+|------|------|
+| [front_cam_object_detection.cpp](vision/object_detection/front_cam_object_detection.cpp) | The ROS node: parameters, ZED camera, grab loop, publishers, services |
+| [rfdetr_engine.cpp](vision/object_detection/rfdetr_engine.cpp) | Small wrapper around rf-detr-cpp: builds/loads the TensorRT engine, runs one image, returns 2D boxes |
+| [detection_geometry.cpp](vision/object_detection/detection_geometry.cpp) | 3D position from a 2D box: Snell's law, depth modes, covariance. Line-for-line port of [utils.py](vision/object_detection/utils.py), no ROS/CUDA/ZED dependency |
+| [rfdetr_detect_image.cpp](vision/object_detection/rfdetr_detect_image.cpp) | Command-line tool to run the model on one image (see [Testing](#testing-without-the-robot)) |
+| [test_detection_geometry.cpp](test/test_detection_geometry.cpp) | Unit tests for the geometry, checked against values computed with the Python functions |
+
+Each frame, the node:
+1. grabs a frame from the ZED SDK (or receives an image on `image_topic` when `has_zed_sdk: false`)
+2. snapshots the AUV pose (ZED VIO or `state/pose`, Z from the pressure sensor)
+3. runs RF-DETR on the GPU: resize + normalization happen in a CUDA kernel, then TensorRT, then box decoding
+4. drops unknown classes and border detections, crops gate boxes, and computes the 3D position with the configured depth mode
+5. publishes the `VisionDetectionFrame`, then the annotated image, depth and `CameraInfo`
+
+Camera grabbing and inference run in a dedicated thread. GPU and image buffers are allocated once at startup and reused, so memory does not grow per frame.
+
+> [!NOTE]
+> Class indices are 0-based (`gate` = 0), matching `class_names.txt`. rf-detr-cpp's own detector class assumes a background class at index 0, which would drop `gate` and shift every label by one, so `rfdetr_engine.cpp` calls the lower-level rf-detr-cpp API with `bg_class_index = -1` instead.
+
+### Building
+
+The submodule must be checked out:
+
+```bash
+git submodule update --init ros2_ws/src/vision/external/rf-detr-cpp
+colcon build --packages-up-to vision
+```
+
+- The RF-DETR targets are only built when CUDA **and** TensorRT are found (the Jetson image). On CPU-only images (`auv-dev`, x86, arm) CMake prints `vision: CUDA/TensorRT not found, skipping RF-DETR C++ detection nodes` and only the Python node is installed.
+- The ZED part is only compiled when the ZED SDK is found. Without it, the node only supports `has_zed_sdk: false`.
+- The first configure downloads `nlohmann_json` (used by rf-detr-cpp), so the Jetson needs internet for the first build.
+
+`vision_pipeline.launch.py` starts the C++ node if `lib/vision/front_cam_object_detection` is installed, and falls back to `front_cam_object_detection.py` otherwise. To go back to the Python node on the Jetson, check out a branch without the C++ node and rebuild `vision`.
+
+### TensorRT Engine (`rfdetr_cpp_fp16.engine`)
+
+The C++ node does not use `engine.plan`. It builds its own engine next to the weights:
+
+```
+models/<model_dir>/weights.onnx              <- input (not in git, copy it by hand)
+models/<model_dir>/rfdetr_cpp_fp16.engine    <- built automatically
+models/<model_dir>/rfdetr_cpp_fp16.engine.json
+```
+
+- On startup, if the engine is missing or older than `weights.onnx`, the node runs `rfdetr_build --onnx weights.onnx --precision fp16` (installed in `lib/vision/`). This takes **~2–3 minutes** on the Orin, once. Later starts load it in under a second.
+- It has its own file name so it never overwrites the `engine.plan` used by the Python node; both can live in the same model folder.
+- To swap models, replace `weights.onnx`: the engine is rebuilt automatically because the ONNX is newer. Delete the `.engine` to force a rebuild.
+- Like `engine.plan`, it is device-specific and ignored by git.
+
+To build it ahead of time (for example before a short sim run), run the test tool once on any image, see below.
+
+### Testing Without The Robot
+
+All commands run inside the Jetson container, from `~/AUV/ros2_ws` after `source install/setup.bash`.
+
+**Geometry unit tests** (also run on CPU-only machines):
+```bash
+colcon test --packages-select vision --ctest-args -R test_detection_geometry
+colcon test-result --verbose
+```
+
+**Model on one image** (no camera, no ROS). Builds the engine if needed, prints the detections and writes an annotated image:
+```bash
+./install/vision/lib/vision/rfdetr_detect_image \
+    install/vision/share/vision/models/real_front_cam_rfdetr_onnx <image.jpg> [threshold=0.5] [out.jpg]
+```
+
+**Full node without the ZED**, fed by any image topic. When run without the launch file, `model_relative_path_override` must be given (the launch file normally sets it) and `pose_source` must be `auv_pose` since VIO needs the ZED:
+```bash
+# override.yaml:
+# front_cam_object_detection:
+#   ros__parameters:
+#     model_relative_path_override: ""
+./install/vision/lib/vision/front_cam_object_detection --ros-args \
+    --params-file src/vision/config/vision_pipeline.yaml --params-file override.yaml \
+    -p has_zed_sdk:=false -p sim:=false -p compressed:=false \
+    -p image_topic:=/test/image -p pose_source:=auv_pose
+```
+In this mode detections are 2D only (3D position is zero), same as the Python node. The node waits until something publishes `state/pose`.
+
+Use `export ROS_DOMAIN_ID=<unused number>` in every terminal to test without interfering with the rest of the robot.
+
+### Watching It Live With Foxglove
+
+`foxglove_bridge` is installed in the Jetson image, so the feed can be watched from a laptop over Tailscale without a screen on the Jetson:
+
+```bash
+# on the Jetson container, same ROS_DOMAIN_ID as the node
+ros2 launch foxglove_bridge foxglove_bridge_launch.xml port:=8765
+```
+
+1. Open [app.foxglove.dev](https://app.foxglove.dev) or the Foxglove app → **Open connection** → **Foxglove WebSocket** (not Rosbridge) → `ws://<jetson-tailscale-ip>:8765`
+2. Add an **Image** panel on `/vision/front_cam/detection_frame/annotated/compressed`
+3. Add a **Raw Messages** panel on `/vision/front_cam/detection_frame` to see labels, scores and 3D positions
+
+Start the node with `compressed:=true` when watching over the network: the raw annotated image is ~22 MB/s at 30 FPS, the JPEG version ~2 MB/s.
+
+### Troubleshooting
+
+| Symptom | Cause / fix |
+|---------|-------------|
+| `CAMERA STREAM FAILED TO START` / `Failed to open ZED camera after 5 attempts` | Another program holds the camera (ZED_Explorer, the Python node, another instance). Only one process can open the ZED. Close it and restart. |
+| First start takes ~2–3 minutes | The TensorRT engine is being built. Only happens once per model. |
+| `pose source='zed_vio' requires enable_vio=true` | `has_zed_sdk: false` disables VIO. Use `pose_source: auv_pose`. Same check as the Python node. |
+| `Statically typed parameter 'model_relative_path_override' must be initialized` | The node was started without the launch file. Pass it as `""` through a params file (see above). |
+| `Waiting for AUV pose on state/pose` | `pose_source: auv_pose` but nothing publishes `state/pose` (sensors not running). |
+| `Unsupported zed_... 'X'. Expected one of: ...` | A ZED setting name in the yaml is not a valid ZED SDK value; the error lists the valid ones. Spaces and underscores are treated the same (`GEN_3` = `GEN 3`). |
+| `Engine builder not found` | `rfdetr_build` is missing from `lib/vision/`: the package was built without CUDA/TensorRT. Rebuild in the Jetson image. |
+| Sim mode never connects (`Stream Opening returned TIMEOUT`) | The Unity sim is not streaming. On the Jetson the sim runs under FEX and its x86 ZED plugin cannot load (`DllNotFoundException: sl_zed` in `~/.config/unity3d/McGill Robotics/AUV-SIM-UNITY/Player.log`). Run the sim on an x86 PC with an NVIDIA GPU and set `stream.ip` to that PC. |
+| Memory grows for the first ~15 min | Expected with VIO on (ZED positional tracking). Measured on the Orin: ~1.6 GB → ~1.8 GB over 15 min, then flat. |
+| `Connection failed ... rosbridge` in Foxglove | Wrong connection type, pick **Foxglove WebSocket**. |
+
 ## Frames And TF
 
 The front-camera pipeline currently uses:
@@ -413,6 +535,7 @@ A model package directory must contain:
 | `class_names.txt` | One class label per line, order matches the model output indices |
 | `weights.onnx` | ONNX weights file (`.placeholder` in templates, replaced with real weights after export) |
 | `engine.plan` | Native TensorRT GPU engine compiled for the Orin GPU (`sm_87`) |
+| `rfdetr_cpp_fp16.engine` | TensorRT engine for the C++ node, built automatically from `weights.onnx` (see [TensorRT Engine](#tensorrt-engine-rfdetr_cpp_fp16engine)) |
 
 The two templates under `models/` show the required layout:
 
