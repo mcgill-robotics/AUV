@@ -351,7 +351,7 @@ To build it ahead of time (for example before a short sim run), run the test too
 - Camera controls (`brightness`, `auto_exposure`, ...) are applied at startup and can be changed live with `ros2 param set`, through OpenCV or `v4l2-ctl` like the Python node.
 - If the model folder only has the weights placeholder, the node publishes the raw feed without detections (same as Python).
 
-The Python node stays the default until the C++ one is validated: with images fed on `image_topic` at 30 FPS, the C++ node has been seen to stop producing output after 1–2 minutes (process alive, node gone from `ros2 node list`; cause not found yet). To try the C++ node: `ros2 launch vision vision_pipeline.launch.py down_cam_cpp:=true`.
+The Python node stays the default until the C++ one has been tested with the real USB camera. To try the C++ node: `ros2 launch vision vision_pipeline.launch.py down_cam_cpp:=true`.
 
 Test on one image (no camera), like the front model:
 ```bash
