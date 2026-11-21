@@ -26,7 +26,7 @@ def generate_launch_description():
         executable='attitude_controller',
         name='attitude_controller',
         output='screen',
-        parameters=[sim_yaml],
+        parameters=[sim_yaml, {"use_sim_time": True}],
         condition=IfCondition(LaunchConfiguration('sim')),
     )
 

@@ -89,7 +89,8 @@ def generate_launch_description():
     navigation_server_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             LaunchConfiguration("navigation_server_launch_file")
-        )
+        ),
+        launch_arguments={"sim": sim}.items(),
     )
 
     debug_setpoint_service_node = Node(
@@ -97,6 +98,7 @@ def generate_launch_description():
         executable="debug_setpoint_service.py",
         name="debug_setpoint_service",
         output="screen",
+        parameters=[{"use_sim_time": sim}],
     )
     
     return LaunchDescription([

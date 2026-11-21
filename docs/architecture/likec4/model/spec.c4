@@ -1,0 +1,57 @@
+specification {
+  element actor {
+    style {
+      shape person
+      color sky
+    }
+  }
+  element system
+  // Software and services we do not own (ZED SDK, Roboflow).
+  element external {
+    style {
+      color slate
+    }
+  }
+  // Physical things on the vehicle.
+  element device {
+    style {
+      color gray
+      shape rectangle
+    }
+  }
+  element app
+  element store {
+    style {
+      shape storage
+      color green
+    }
+  }
+  element component {
+    style {
+      color indigo
+    }
+  }
+
+  // Arrows: the default dashed grey arrow is data on a ROS topic.
+  // A 'call' is a request that expects an answer: a service call or an action goal.
+  relationship call {
+    color amber
+    line dotted
+  }
+
+  // The answer to a call (action feedback and result). Drawn only in flows.
+  relationship reply {
+    color green
+    line dotted
+    head onormal
+  }
+
+  // bringup starting another package's launch file.
+  relationship launch {
+    color gray
+    line solid
+  }
+
+  tag sim
+  tag real
+}
