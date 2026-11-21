@@ -15,7 +15,7 @@ class OpenVinsSimAdapter(Node):
         self.flip = self.declare_parameter("flip", "vertical").value
         self.imu_delay = float(self.declare_parameter("imu_delay", 0.15).value)
         image_in = self.declare_parameter("image_in", "/zed/zed_node/rgb/color/rect/image/compressed").value
-        image_out = self.declare_parameter("image_out", "/openvins/front/image_raw").value
+        image_out = self.declare_parameter("image_out", "/openvins/front/image_raw").value # to test: maybe copying images again uselessly?
         imu_in = self.declare_parameter("imu_in", "/imu/data").value
         imu_out = self.declare_parameter("imu_out", "/openvins/imu").value
 
