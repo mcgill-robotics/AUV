@@ -26,6 +26,13 @@ def generate_launch_description():
         description='Use keyboard instead of gamepad for input'
     )
 
+    sim_arg = DeclareLaunchArgument(
+        'sim',
+        default_value='false',
+        description='true to run teleop on simulation time (/clock)'
+    )
+    use_sim_time = {'use_sim_time': LaunchConfiguration('sim')}
+
     # Joy node for gamepad input (only if not using keyboard)
     joy_node = Node(
         condition=UnlessCondition(LaunchConfiguration('use_keyboard')),
@@ -35,7 +42,7 @@ def generate_launch_description():
         parameters=[{
             'deadzone': 0.1,
             'autorepeat_rate': 20.0,
-        }],
+        }, use_sim_time],
         output='screen'
     )
 
@@ -51,11 +58,13 @@ def generate_launch_description():
         parameters=[
             config_file,  # Load YAML config first
             {'require_deadman': LaunchConfiguration('require_deadman')},  # Override
+            use_sim_time,
         ],
         output='screen'
     )
 
     return LaunchDescription([
+        sim_arg,
         deadman_arg,
         keyboard_arg,
         LogInfo(

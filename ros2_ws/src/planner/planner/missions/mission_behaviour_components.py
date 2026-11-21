@@ -523,17 +523,10 @@ class SetActuatorBehaviour(py_trees.behaviour.Behaviour):
                 self.topic_name = topic_name
                 self.command_value = int(command_value)
                 self.publisher = None
-                self.fallback_publisher = None
 
         def setup(self, **kwargs):
                 self.node = kwargs['node']
                 self.publisher = self.node.create_publisher(UInt8, self.topic_name, 10)
-                if self.topic_name.startswith("/actuators/"):
-                        fallback_topic = self.topic_name.replace("/actuators/", "/actuator/", 1)
-                        self.fallback_publisher = self.node.create_publisher(UInt8, fallback_topic, 10)
-                elif self.topic_name.startswith("/actuator/"):
-                        fallback_topic = self.topic_name.replace("/actuator/", "/actuators/", 1)
-                        self.fallback_publisher = self.node.create_publisher(UInt8, fallback_topic, 10)
                 self.node.get_logger().info(f"[{self.name}] Created publisher for {self.topic_name}")
 
         def update(self) -> py_trees.common.Status:
@@ -542,8 +535,6 @@ class SetActuatorBehaviour(py_trees.behaviour.Behaviour):
                         return py_trees.common.Status.FAILURE
                 msg = UInt8(data=self.command_value)
                 self.publisher.publish(msg)
-                if self.fallback_publisher is not None:
-                        self.fallback_publisher.publish(msg)
                 self.node.get_logger().info(f"[{self.name}] Published {self.command_value} to {self.topic_name}")
                 return py_trees.common.Status.SUCCESS
 
