@@ -70,7 +70,7 @@ Here is the general formula for a standard pinhole camera model based on the len
 | `enable_object_detection` | `bool` | `true` | Enable object detection inference globally |
 | `has_zed_sdk` | `bool` | `true` | Whether the ZED SDK is available (set `false` for non-ZED hardware) |
 | `front_cam_cpp` | `bool` | `true` | Run the C++ front camera node; `false` uses the Python one. Ignored (Python) when the C++ node is not built |
-| `down_cam_cpp` | `bool` | `true` | Run the C++ down camera node; `false` uses the Python one. Ignored (Python) when the C++ node is not built |
+| `down_cam_cpp` | `bool` | `false` | Run the C++ down camera node instead of the Python one. Ignored (Python) when the C++ node is not built |
 
 Example overrides:
 
@@ -162,7 +162,7 @@ Thus, detections are kept in the camera frame world-frame conversion to `object_
 
 ### Down Camera Detection Node
 
-The down camera node (C++ by default, Python still available with `down_cam_cpp:=false`, see [C++ Down Camera Node](#c-down-camera-node)):
+The down camera node (Python by default; the C++ port runs with `down_cam_cpp:=true`, see [C++ Down Camera Node](#c-down-camera-node)):
 - grabs the USB down camera directly (V4L2), or subscribes to `image_topic` in sim
 - runs an RF-DETR **segmentation** model: each detection comes with a mask
 - uses the mask centroid as the object position in the image, and the mask's min-area rectangle for its in-plane yaw (skipped when the box touches the image border)
@@ -351,7 +351,7 @@ To build it ahead of time (for example before a short sim run), run the test too
 - Camera controls (`brightness`, `auto_exposure`, ...) are applied at startup and can be changed live with `ros2 param set`, through OpenCV or `v4l2-ctl` like the Python node.
 - If the model folder only has the weights placeholder, the node publishes the raw feed without detections (same as Python).
 
-The Python node is kept until the C++ one has been validated in the pool. To switch back: `ros2 launch vision vision_pipeline.launch.py down_cam_cpp:=false`.
+The Python node stays the default until the C++ one is validated: with images fed on `image_topic` at 30 FPS, the C++ node has been seen to stop producing output after 1–2 minutes (process alive, node gone from `ros2 node list`; cause not found yet). To try the C++ node: `ros2 launch vision vision_pipeline.launch.py down_cam_cpp:=true`.
 
 Test on one image (no camera), like the front model:
 ```bash

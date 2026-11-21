@@ -76,8 +76,8 @@ def generate_launch_description():
 
     down_cam_cpp_arg = DeclareLaunchArgument(
         "down_cam_cpp",
-        default_value="true",
-        description="Run the C++ down camera node (needs CUDA + TensorRT). Set false to use the Python node."
+        default_value="false",
+        description="Run the C++ down camera node (needs CUDA + TensorRT) instead of the Python node."
     )
 
     enable_object_detection_arg = DeclareLaunchArgument(
