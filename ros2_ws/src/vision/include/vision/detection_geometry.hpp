@@ -1,0 +1,130 @@
+#pragma once
+
+// Camera-frame 3D localisation of 2D detections, ported from
+// vision/object_detection/utils.py and FrontCamObjectDetectorNode._compute_3d_position.
+// Kept free of ROS / CUDA / ZED so it builds and is unit-tested on every machine.
+
+#include <array>
+#include <optional>
+#include <string>
+#include <unordered_map>
+#include <utility>
+#include <vector>
+
+#include <Eigen/Dense>
+#include <opencv2/core.hpp>
+
+namespace vision {
+
+struct BBoxXYXY {
+    double x1 = 0.0;
+    double y1 = 0.0;
+    double x2 = 0.0;
+    double y2 = 0.0;
+};
+
+struct CameraIntrinsics {
+    double fx = 0.0;
+    double fy = 0.0;
+    double cx = 0.0;
+    double cy = 0.0;
+};
+
+// Flat-port refraction: scale ZED depth by the 1D horizontal tangential virtual depth.
+double apply_snells_law_depth(double z_raw, double u, double fx, double depth_scale = 1.42, double n_w = 1.333);
+
+// Flat-port refraction: un-project a pixel offset (u, v) at true depth z_true into metric (x, y).
+std::pair<double, double> apply_snells_law_lateral(double z_true, double u, double v, double fx, double fy,
+                                                   double n_w = 1.333);
+
+// numpy.percentile (linear interpolation) and numpy.median equivalents. `values` is reordered.
+double percentile(std::vector<float>& values, double pct);
+
+struct RoiDepth {
+    double z_raw;     // median or nearest-percentile depth in metres
+    double variance;  // population variance of the valid ROI pixels
+};
+
+// Robust depth inside a bbox of a CV_32FC1 metre depth map (NaN/inf/<=0.1 m ignored).
+// nearest=false -> median of the bbox shrunk by shrink_ratio, nearest=true -> `nearest_percentile`.
+std::optional<RoiDepth> depth_from_roi(const cv::Mat& depth, const BBoxXYXY& bbox, bool nearest,
+                                       double shrink_ratio, double nearest_percentile,
+                                       double min_valid_fraction);
+
+struct DepthEstimationConfig {
+    std::string default_mode = "depth_map_median";
+    std::unordered_map<std::string, std::string> mode_by_label;
+    std::unordered_map<std::string, double> known_heights;
+    std::unordered_map<std::string, double> known_planes;
+    double depth_map_shrink_ratio = 0.8;
+    double depth_map_nearest_percentile = 15.0;
+    double depth_map_min_valid_fraction = 0.05;
+    double max_pitch_deg = 20.0;
+    double max_roll_deg = 20.0;
+    int border_margin_px = 0;
+
+    const std::string& mode_for(const std::string& label) const;
+};
+
+struct RefractionParams {
+    double depth_scale = 1.0;
+    double lateral_scale = 1.333;  // water refractive index used for lateral un-projection
+    double depth_offset = 0.0;
+};
+
+// 3D point and covariance from the ZED SDK custom-box pipeline (zed_3d mode / fallback).
+// position is in the ZED camera frame (RIGHT_HANDED_Z_UP_X_FWD); covariance is the
+// packed upper triangle [xx, xy, xz, yy, yz, zz].
+struct ZedObject3D {
+    Eigen::Vector3d position;
+    std::array<double, 6> covariance;
+};
+
+struct Position3D {
+    Eigen::Vector3d position;  // ROS camera frame: X forward, Y left, Z up
+    Eigen::Matrix3d covariance;
+};
+
+struct Compute3DInput {
+    std::string label;
+    BBoxXYXY bbox;
+    int img_h = 0;
+    std::optional<Eigen::Matrix4d> T_world_camera;
+    double auv_roll = 0.0;
+    double auv_pitch = 0.0;
+    const cv::Mat* depth = nullptr;  // CV_32FC1 metres, may be null (sim without ZED)
+    std::optional<ZedObject3D> zed_object;
+};
+
+std::optional<Position3D> compute_3d_position(const Compute3DInput& in, const DepthEstimationConfig& cfg,
+                                              const CameraIntrinsics& K, const RefractionParams& refraction);
+
+// ---------------------------------------------------------------------------
+// Down camera (port of the Python DownCamObjectDetectorNode)
+// ---------------------------------------------------------------------------
+
+struct DownCamMaskGeometry {
+    // Mask centroid, or the bbox centre when there is no usable mask.
+    double center_x = 0.0;
+    double center_y = 0.0;
+    // Image-plane angle (rad) of the long side of the mask's min-area rectangle.
+    // Unset without a usable mask or when the bbox touches the image border (object partly visible).
+    std::optional<double> yaw;
+    // Oriented box corners for drawing: the min-area rectangle, or the axis-aligned bbox.
+    std::array<cv::Point2f, 4> box;
+};
+
+// `mask` is CV_8UC1 (any non-zero = object), same size as the image, or empty for detection-only models.
+DownCamMaskGeometry analyze_down_cam_mask(const cv::Mat& mask, const BBoxXYXY& bbox, int img_w, int img_h,
+                                          int border_margin);
+
+// Intersects the (Snell-corrected) ray through pixel (u, v) with the horizontal plane z = target_z in the
+// world frame. T_world_camera maps the down camera frame (X along the optical axis) to the world.
+// Returns the hit point in the camera frame, or nothing when the ray is horizontal or the plane is behind.
+std::optional<Eigen::Vector3d> project_down_cam_to_plane(double u, double v, const CameraIntrinsics& K, double n_w,
+                                                         const Eigen::Matrix4d& T_world_camera, double target_z);
+
+// Orientation, in the down camera frame, of an object lying flat with image-plane angle `yaw`.
+Eigen::Quaterniond down_cam_orientation_from_yaw(double yaw);
+
+}  // namespace vision
