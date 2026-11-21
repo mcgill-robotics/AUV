@@ -4,7 +4,7 @@ import yaml
 from ament_index_python.packages import get_package_prefix, get_package_share_directory
 
 from launch import LaunchDescription
-from launch.actions import IncludeLaunchDescription, DeclareLaunchArgument, LogInfo, TimerAction
+from launch.actions import IncludeLaunchDescription, DeclareLaunchArgument,TimerAction
 from launch.conditions import IfCondition,UnlessCondition
 from launch_ros.actions import Node
 from launch.launch_description_sources import PythonLaunchDescriptionSource
@@ -66,6 +66,12 @@ def generate_launch_description():
         "down_model_relative_path",
         default_value="",
         description="Optional override path to the down camera object detection model relative to vision package."
+    )
+
+    front_cam_cpp_arg = DeclareLaunchArgument(
+        "front_cam_cpp",
+        default_value="true",
+        description="Run the C++ front camera node (needs CUDA + TensorRT). Set false to use the Python node."
     )
 
     down_cam_cpp_arg = DeclareLaunchArgument(
@@ -152,13 +158,16 @@ def generate_launch_description():
     ])
     
     # The C++ node is only built on machines with CUDA + TensorRT (Jetson / NVIDIA images).
-    front_detection_available = os.path.exists(
-        os.path.join(get_package_prefix("vision"), "lib", "vision", "front_cam_object_detection")
-    )
+    # Elsewhere (e.g. CPU-only dev containers) fall back to the Python node.
+    cpp_front_detector = os.path.join(get_package_prefix("vision"), "lib", "vision", "front_cam_object_detection")
+    front_detection_executable = PythonExpression([
+        "'front_cam_object_detection' if '", LaunchConfiguration("front_cam_cpp"), "' == 'true' and ",
+        str(os.path.exists(cpp_front_detector)), " else 'front_cam_object_detection.py'"
+    ])
 
     front_detection_node = Node(
         package='vision',
-        executable='front_cam_object_detection',
+        executable=front_detection_executable,
         name='front_cam_object_detection',
         parameters=[
             config_path,
@@ -329,6 +338,7 @@ def generate_launch_description():
     launch_description.add_action(use_enhance_arg)
     launch_description.add_action(front_model_arg)
     launch_description.add_action(down_model_arg)
+    launch_description.add_action(front_cam_cpp_arg)
     launch_description.add_action(down_cam_cpp_arg)
     launch_description.add_action(enable_object_detection_arg)
     launch_description.add_action(has_zed_sdk_arg)
@@ -342,13 +352,7 @@ def generate_launch_description():
     launch_description.add_action(down_cam_to_optical_tf)
     # launch_description.add_action(front_cam_enhancement_node)
     # launch_description.add_action(down_cam_enhancement_node)
-    if front_detection_available:
-        launch_description.add_action(front_detection_node)
-    else:
-        launch_description.add_action(LogInfo(msg=(
-            "front_cam_object_detection is not built (needs CUDA + TensorRT, i.e. the jetson or nvidia image): "
-            "skipping front camera detection."
-        )))
+    launch_description.add_action(front_detection_node)
     launch_description.add_action(down_detection_node)
     launch_description.add_action(object_map_node)
 

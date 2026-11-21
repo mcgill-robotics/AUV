@@ -10,7 +10,8 @@ import supervision as sv
 from inference_models import AutoModel, BackendType
 import inference_models.models.rfdetr.optimization.postprocessors.base as post_base
 import inference_models.models.rfdetr.common as rf_common
-from tf_transformations import euler_matrix
+from geometry_msgs.msg import PoseStamped, Quaternion
+from tf_transformations import euler_matrix, quaternion_from_matrix
 import torch
 
 # Disable PyTorch CUDA graphs for TRT backend (PyTorch wheel lacks sm_87 kernels for graph capture)
@@ -298,6 +299,84 @@ def build_transform_matrix_from_xyz_rpy(
     )
     transform[0:3, 3] = translation_xyz
     return transform
+
+def build_quaternion_msg(orientation_xyzw: np.ndarray) -> Quaternion:
+    orientation = Quaternion()
+    orientation.x = float(orientation_xyzw[0])
+    orientation.y = float(orientation_xyzw[1])
+    orientation.z = float(orientation_xyzw[2])
+    orientation.w = float(orientation_xyzw[3])
+    return orientation
+
+def build_pose_message(
+    translation: np.ndarray,
+    orientation_xyzw: np.ndarray,
+    frame_id: str,
+    stamp,
+) -> PoseStamped:
+    pose_msg = PoseStamped()
+    pose_msg.header.stamp = stamp
+    pose_msg.header.frame_id = frame_id
+    pose_msg.pose.position.x = float(translation[0])
+    pose_msg.pose.position.y = float(translation[1])
+    pose_msg.pose.position.z = float(translation[2])
+    pose_msg.pose.orientation = build_quaternion_msg(orientation_xyzw)
+    return pose_msg
+
+def build_pose_message_from_transform(
+    transform: np.ndarray,
+    frame_id: str,
+    stamp,
+) -> PoseStamped:
+    translation = transform[0:3, 3]
+    orientation_xyzw = quaternion_from_matrix(transform)
+    return build_pose_message(translation, orientation_xyzw, frame_id, stamp)
+
+def bbox_from_xyxy(x1: float, y1: float, x2: float, y2: float):
+    size_x = max(0.0, float(x2) - float(x1))
+    size_y = max(0.0, float(y2) - float(y1))
+    center_x = float(x1) + size_x / 2.0
+    center_y = float(y1) + size_y / 2.0
+    return center_x, center_y, size_x, size_y
+
+def bbox_from_zed_corners(corners) -> tuple[float, float, float, float]:
+    if corners is None or len(corners) == 0:
+        return 0.0, 0.0, 0.0, 0.0
+
+    xs = [float(point[0]) for point in corners]
+    ys = [float(point[1]) for point in corners]
+    return bbox_from_xyxy(min(xs), min(ys), max(xs), max(ys))
+
+def apply_snells_law_depth(z_raw, u, fx, depth_scale=1.42, n_w=1.333):
+    """
+    Applies 1D horizontal tangential virtual depth scaling for a stereo camera behind a flat port.
+    
+    Corrects for:
+    Flat port refraction astigmatism. A flat port magnifies depth differently depending on the 
+    viewing angle. ZED computes depth strictly from horizontal disparity, so scaling depth by the 
+    full 2D radial angle incorrectly over-corrects vertical extremes (warping flat objects into 
+    "Pringle" shapes). Instead, we apply Snell's Law to just the 1D horizontal angle.
+    
+    Dynamic Scale:
+    The theoretical Tangential Virtual Depth scales by the ratio of cosines cubed.
+    dynamic_scale = depth_scale * (cos^3(theta_w_x) / cos^3(theta_a_x))
+    This scale is smallest in the center of the image and smoothly increases as the object 
+    moves horizontally toward the edges of the frame.
+    """
+    if fx == 0:
+        return z_raw * depth_scale
+        
+    u_norm = u / fx
+    r_a_x = max(abs(u_norm), 1e-6)
+    
+    cos_a_x = 1.0 / math.sqrt(1.0 + r_a_x**2)
+    sin_a_x = r_a_x * cos_a_x
+    
+    sin_w_x = sin_a_x / n_w
+    cos_w_x = math.sqrt(1.0 - sin_w_x**2)
+    
+    dynamic_scale = depth_scale * (cos_w_x**3 / cos_a_x**3)
+    return z_raw * dynamic_scale
 
 def apply_snells_law_lateral(z_true, u, v, fx, fy, n_w=1.333):
     """

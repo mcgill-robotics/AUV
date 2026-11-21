@@ -4,8 +4,8 @@ This package contains the front-camera detection pipeline, the persistent 3D obj
 
 Key files:
 - [vision_pipeline.launch.py](launch/vision_pipeline.launch.py)
-- [front_cam_object_detection.cpp](vision/object_detection/front_cam_object_detection.cpp) (see [C++ Front Camera Node](#c-front-camera-node-rf-detr--tensorrt))
-- [down_cam_object_detection_node.py](vision/object_detection/down_cam_object_detection_node.py)
+- [front_cam_object_detection_node.py](vision/object_detection/front_cam_object_detection_node.py)
+- [front_cam_object_detection.cpp](vision/object_detection/front_cam_object_detection.cpp) (C++ port, see [C++ Front Camera Node](#c-front-camera-node-rf-detr--tensorrt))
 - [object_map.cpp](vision/object_map.cpp)
 - [object_tracker.cpp](vision/object_map/object_tracker.cpp)
 
@@ -69,6 +69,7 @@ Here is the general formula for a standard pinhole camera model based on the len
 | `down_model_relative_path` | `string` | `models/template_yolo` | Path to down camera model package relative to vision package |
 | `enable_object_detection` | `bool` | `true` | Enable object detection inference globally |
 | `has_zed_sdk` | `bool` | `true` | Whether the ZED SDK is available (set `false` for non-ZED hardware) |
+| `front_cam_cpp` | `bool` | `true` | Run the C++ front camera node; `false` uses the Python one. Ignored (Python) when the C++ node is not built |
 | `down_cam_cpp` | `bool` | `true` | Run the C++ down camera node; `false` uses the Python one. Ignored (Python) when the C++ node is not built |
 
 Example overrides:
@@ -283,7 +284,7 @@ This keeps Foxglove simple because you do not need to switch image topics to com
 
 ## C++ Front Camera Node (RF-DETR + TensorRT)
 
-`front_cam_object_detection` is a native C++ node. It replaced the former Python node with the same parameters (same yaml block), topics, services and messages, so `object_map` and the rest of the stack did not change. Inference runs on TensorRT through [rf-detr-cpp](https://github.com/infracv/rf-detr-cpp) (git submodule under `external/rf-detr-cpp`) instead of Roboflow `inference-models` + PyTorch. The down camera node is still Python.
+`front_cam_object_detection` also exists as a native C++ node. It is a port of the Python node: same parameters (same yaml block), same topics, services and messages, so `object_map` and the rest of the stack do not see a difference. Inference runs on TensorRT through [rf-detr-cpp](https://github.com/infracv/rf-detr-cpp) (git submodule under `external/rf-detr-cpp`) instead of Roboflow `inference-models` + PyTorch.
 
 ### How It Works
 
@@ -293,7 +294,7 @@ Files:
 |------|------|
 | [front_cam_object_detection.cpp](vision/object_detection/front_cam_object_detection.cpp) | The ROS node: parameters, ZED camera, grab loop, publishers, services |
 | [rfdetr_engine.cpp](vision/object_detection/rfdetr_engine.cpp) | Small wrapper around rf-detr-cpp: builds/loads the TensorRT engine, runs one image, returns 2D boxes |
-| [detection_geometry.cpp](vision/object_detection/detection_geometry.cpp) | 3D position from a 2D box: Snell's law, depth modes, covariance. Line-for-line port of the Python implementation, no ROS/CUDA/ZED dependency |
+| [detection_geometry.cpp](vision/object_detection/detection_geometry.cpp) | 3D position from a 2D box: Snell's law, depth modes, covariance. Line-for-line port of [utils.py](vision/object_detection/utils.py), no ROS/CUDA/ZED dependency |
 | [rfdetr_detect_image.cpp](vision/object_detection/rfdetr_detect_image.cpp) | Command-line tool to run the model on one image (see [Testing](#testing-without-the-robot)) |
 | [test_detection_geometry.cpp](test/test_detection_geometry.cpp) | Unit tests for the geometry, checked against values computed with the Python functions |
 
@@ -318,11 +319,11 @@ git submodule update --init ros2_ws/src/vision/external/rf-detr-cpp
 colcon build --packages-up-to vision
 ```
 
-- The RF-DETR targets are only built when CUDA **and** TensorRT are found (the `jetson` and `nvidia` images). On CPU-only images (x86, arm) CMake prints `vision: CUDA/TensorRT not found, skipping RF-DETR C++ detection nodes` and the front camera node is not installed.
+- The RF-DETR targets are only built when CUDA **and** TensorRT are found (the `jetson` and `nvidia` images). On CPU-only images (x86, arm) CMake prints `vision: CUDA/TensorRT not found, skipping RF-DETR C++ detection nodes` and only the Python node is installed.
 - The ZED part is only compiled when the ZED SDK is found. Without it, the node only supports `has_zed_sdk: false`.
 - The first configure downloads `nlohmann_json` (used by rf-detr-cpp), so the Jetson needs internet for the first build.
 
-When the node is not installed, `vision_pipeline.launch.py` logs a message and skips front camera detection; the rest of the pipeline still starts.
+`vision_pipeline.launch.py` starts the C++ node if `lib/vision/front_cam_object_detection` is installed, and falls back to `front_cam_object_detection.py` otherwise. The Python node is kept until the C++ one has been validated in the pool. To switch back: `ros2 launch vision vision_pipeline.launch.py front_cam_cpp:=false`.
 
 ### TensorRT Engine (`rfdetr_cpp_fp16.engine`)
 
@@ -335,7 +336,7 @@ models/<model_dir>/rfdetr_cpp_fp16.engine.json
 ```
 
 - On startup, if the engine is missing or older than `weights.onnx`, the node runs `rfdetr_build --onnx weights.onnx --precision fp16` (installed in `lib/vision/`). This takes **~2–3 minutes** on the Orin, once. Later starts load it in under a second.
-- It has its own file name so it never collides with an `engine.plan` built for the Python `inference-models` backend (still used by the down camera).
+- It has its own file name so it never overwrites the `engine.plan` used by the Python node; both can live in the same model folder. Note: the first time the Python node runs on a model (or after `weights.onnx` changes) it deletes every `*.engine` in the folder, so the C++ node rebuilds its engine (~2–3 min) on its next start.
 - To swap models, replace `weights.onnx`: the engine is rebuilt automatically because the ONNX is newer. Delete the `.engine` to force a rebuild.
 - Like `engine.plan`, it is device-specific and ignored by git.
 
@@ -384,7 +385,7 @@ colcon test-result --verbose
     -p has_zed_sdk:=false -p sim:=false -p compressed:=false \
     -p image_topic:=/test/image -p pose_source:=auv_pose
 ```
-In this mode detections are 2D only (3D position is zero), as in the former Python node. The node waits until something publishes `state/pose`.
+In this mode detections are 2D only (3D position is zero), same as the Python node. The node waits until something publishes `state/pose`.
 
 Use `export ROS_DOMAIN_ID=<unused number>` in every terminal to test without interfering with the rest of the robot.
 
@@ -407,9 +408,9 @@ Start the node with `compressed:=true` when watching over the network: the raw a
 
 | Symptom | Cause / fix |
 |---------|-------------|
-| `CAMERA STREAM FAILED TO START` / `Failed to open ZED camera after 5 attempts` | Another program holds the camera (ZED_Explorer, another instance of the node). Only one process can open the ZED. Close it and restart. |
+| `CAMERA STREAM FAILED TO START` / `Failed to open ZED camera after 5 attempts` | Another program holds the camera (ZED_Explorer, the Python node, another instance). Only one process can open the ZED. Close it and restart. |
 | First start takes ~2–3 minutes | The TensorRT engine is being built. Only happens once per model. |
-| `pose source='zed_vio' requires enable_vio=true` | `has_zed_sdk: false` disables VIO. Use `pose_source: auv_pose`. |
+| `pose source='zed_vio' requires enable_vio=true` | `has_zed_sdk: false` disables VIO. Use `pose_source: auv_pose`. Same check as the Python node. |
 | `Statically typed parameter 'model_relative_path_override' must be initialized` | The node was started without the launch file. Pass it as `""` through a params file (see above). |
 | `Waiting for AUV pose on state/pose` | `pose_source: auv_pose` but nothing publishes `state/pose` (sensors not running). |
 | `Unsupported zed_... 'X'. Expected one of: ...` | A ZED setting name in the yaml is not a valid ZED SDK value; the error lists the valid ones. Spaces and underscores are treated the same (`GEN_3` = `GEN 3`). |
@@ -542,7 +543,7 @@ That is convenient for development, but it also means the package is heavier tha
 
 ## Model Packages
 
-The down camera node loads models using the [Roboflow `inference-models`](https://github.com/roboflow/inference/tree/main/inference_models) library. Each model lives in a self-contained directory under `models/` that `AutoModel.from_pretrained()` reads at startup.
+Detection nodes load models using the [Roboflow `inference-models`](https://github.com/roboflow/inference/tree/main/inference_models) library. Each model lives in a self-contained directory under `models/` that `AutoModel.from_pretrained()` reads at startup.
 
 A model package directory must contain:
 
@@ -553,7 +554,7 @@ A model package directory must contain:
 | `inference_config.json` | Input preprocessing: resolution, color mode, resize strategy, pixel scaling, and normalization. Also post-processing settings like NMS thresholds for YOLO |
 | `class_names.txt` | One class label per line, order matches the model output indices |
 | `weights.onnx` | ONNX weights file (`.placeholder` in templates, replaced with real weights after export) |
-| `engine.plan` | Native TensorRT GPU engine compiled for the Orin GPU (`sm_87`), used by the Python `inference-models` backend |
+| `engine.plan` | Native TensorRT GPU engine compiled for the Orin GPU (`sm_87`) |
 | `rfdetr_cpp_fp16.engine` | TensorRT engine for the C++ node, built automatically from `weights.onnx` (see [TensorRT Engine](#tensorrt-engine-rfdetr_cpp_fp16engine)) |
 
 The two templates under `models/` show the required layout:
@@ -561,7 +562,7 @@ The two templates under `models/` show the required layout:
 - **`template_yolo/`** — YOLOv11 config. Preprocessing is just pixel scaling (`/255`), no mean/std normalization.
 - **`template_rfdetr/`** — RF-DETR config. Pixel scaling (`/255`) followed by ImageNet mean/std normalization (`[0.485, 0.456, 0.406]` / `[0.229, 0.224, 0.225]`), which is standard for DINOv2-backbone models.
 
-The `inference-models` library handles all preprocessing and postprocessing automatically based on these configs. The node just calls `model(image)`. The front camera node uses the same model folder layout but only reads `weights.onnx` and `class_names.txt` (see [TensorRT Engine](#tensorrt-engine-rfdetr_cpp_fp16engine)).
+The `inference-models` library handles all preprocessing and postprocessing automatically based on these configs. The detection nodes just call `model(image)`.
 
 > **Do not delete the template folders.** They are the reference for how to package a new model for deployment. To deploy a new model, copy the matching template, replace `weights.onnx.placeholder` with the real weights, and update `class_names.txt` if needed.
 

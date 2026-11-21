@@ -1,6 +1,6 @@
 #pragma once
 
-// C++ port of the former Python node vision/object_detection/front_cam_object_detection_node.py.
+// C++ port of vision/object_detection/front_cam_object_detection_node.py.
 // Hardware mode (has_zed_sdk): grabs image + depth + VIO from the ZED SDK on a
 // dedicated thread (real camera, or the simulator's ZED stream when sim:=true).
 // Topic mode: subscribes to image_topic and publishes 2D-only detections.
