@@ -1,18 +1,11 @@
 #!/usr/bin/env python3
-"""Adapter between the Unity sim and OpenVINS (used by openvins_sim.launch.py).
-
-The sim's sensor streams need three corrections before OpenVINS can use them:
-  1. The front camera is only published as JPEG -> decode it to a raw mono8 image.
-  2. The JPEG arrives upside down -> flip it (parameter `flip`: vertical | rotate180 | none).
-  3. The sim delays IMU data by `imu_delay` seconds (SensorDelayBuffer, default 0.15 s) but
-     stamps it at publish time -> shift the IMU stamps back so they line up with the camera.
-"""
 import cv2
 import numpy as np
 import rclpy
 from rclpy.duration import Duration
 from rclpy.node import Node
 from rclpy.time import Time
+from geometry_msgs.msg import PoseStamped, PoseWithCovarianceStamped
 from sensor_msgs.msg import CompressedImage, Image, Imu
 
 
@@ -28,8 +21,12 @@ class OpenVinsSimAdapter(Node):
 
         self.pub_image = self.create_publisher(Image, image_out, 10)
         self.pub_imu = self.create_publisher(Imu, imu_out, 200)
+        self.pub_pose = self.create_publisher(PoseStamped, "/front_cam/vio/pose", 10)
+
         self.create_subscription(CompressedImage, image_in, self.on_image, 10)
         self.create_subscription(Imu, imu_in, self.on_imu, 200)
+        self.create_subscription(PoseWithCovarianceStamped, "/ov_msckf/poseimu", self.on_pose, 10)
+
         self.get_logger().info(f"flip={self.flip}, imu_delay={self.imu_delay:.3f}s, {image_in} -> {image_out}, {imu_in} -> {imu_out}")
 
     def on_image(self, msg):
@@ -54,6 +51,12 @@ class OpenVinsSimAdapter(Node):
         stamp = Time.from_msg(msg.header.stamp) - Duration(seconds=self.imu_delay)
         msg.header.stamp = stamp.to_msg()
         self.pub_imu.publish(msg)
+
+    def on_pose(self, msg):
+        out = PoseStamped()
+        out.header = msg.header
+        out.pose = msg.pose.pose
+        self.pub_pose.publish(out)
 
 
 def main():
