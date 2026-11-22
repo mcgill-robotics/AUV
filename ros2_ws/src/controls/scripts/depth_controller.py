@@ -9,7 +9,7 @@ from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy, DurabilityPo
 from rcl_interfaces.msg import SetParametersResult
 from controls.pid import PID
 
-from geometry_msgs.msg import Wrench
+from geometry_msgs.msg import Wrench, PointStamped
 from std_msgs.msg import Float64
 
 
@@ -27,6 +27,7 @@ class DepthController(Node):
 
         self.pub_effort = self.create_publisher(Wrench, '/controls/depth_effort', qos_profile_sensor_data)
         self.sub_depth = self.create_subscription(Float64, 'auv_frame/depth', self.depth_callback, qos_profile_sensor_data)
+        # self.dvl_sub = self.create_subscription(PointStamped, '/auv_frame/dvl/position', self.temp_dvl_callback, qos_profile_sensor_data)
         self.setpoint_sub = self.create_subscription(Float64, '/controls/depth_setpoint', self.setpoint_callback, qos)
 
         self.declare_parameter('control_loop_hz', 10.0)
@@ -77,10 +78,18 @@ class DepthController(Node):
     def _now(self):
         return self.get_clock().now().nanoseconds / 1e9
 
+    def temp_dvl_callback(self, msg):
+        self.last_depth_time = self._now()
+        self.current_depth = -msg.point.z
+        self.depth_received = True
+        self.get_logger().info(f"Current depth: {self.current_depth:.4f} m")
+
     def depth_callback(self, msg):
         self.last_depth_time = self._now()
         self.current_depth = msg.data
         self.depth_received = True
+        self.get_logger().info(f"Current depth: {self.current_depth:.4f} m")
+
 
     def setpoint_callback(self, msg):
         if abs(msg.data - self.target_setpoint_depth) > 1e-3:
