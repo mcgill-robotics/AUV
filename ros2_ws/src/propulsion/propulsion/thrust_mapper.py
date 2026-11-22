@@ -90,11 +90,11 @@ class ThrusterMapper(Node):
             # SWAY (Y)
             [ -np.sin(alpha), 0, 0, -np.sin(alpha), np.sin(alpha), 0, 0, np.sin(alpha)],
             # HEAVE (Z)
-            [ 0, -1, -1, 0, 0, -1, -1, 0],
+            [ 0, -1, -1, 0, 0, 1, -1, 0],
             # ROLL (X-rotation)
-            [ np.sin(alpha)*e, (b+dy), (b+dy), np.sin(alpha)*e, -np.sin(alpha)*e, -(b-dy), -(b-dy), -np.sin(alpha)*e],
+            [ np.sin(alpha)*e, (b+dy), (b+dy), np.sin(alpha)*e, -np.sin(alpha)*e, (b-dy), -(b-dy), -np.sin(alpha)*e],
             # PITCH (Y-rotation)
-            [ np.cos(alpha)*e, -(a+dx), (a-dx), -np.cos(alpha)*e, -np.cos(alpha)*e, (a-dx), -(a+dx), np.cos(alpha)*e],
+            [ np.cos(alpha)*e, -(a+dx), (a-dx), -np.cos(alpha)*e, -np.cos(alpha)*e, -(a-dx), -(a+dx), np.cos(alpha)*e],
             # YAW (Z-rotation)
             [ (np.cos(alpha)*(c+dy) + np.sin(alpha)*(d+dx)), 0, 0, -(np.cos(alpha)*(c+dy) + np.sin(alpha)*(d-dx)), (np.cos(alpha)*(c-dy) + np.sin(alpha)*(d-dx)), 0, 0, -(np.cos(alpha)*(c-dy) + np.sin(alpha)*(d+dx))]
         ])
