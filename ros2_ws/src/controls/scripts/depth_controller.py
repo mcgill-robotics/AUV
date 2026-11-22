@@ -82,13 +82,11 @@ class DepthController(Node):
         self.last_depth_time = self._now()
         self.current_depth = -msg.point.z
         self.depth_received = True
-        self.get_logger().info(f"Current depth: {self.current_depth:.4f} m")
 
     def depth_callback(self, msg):
         self.last_depth_time = self._now()
         self.current_depth = msg.data
         self.depth_received = True
-        self.get_logger().info(f"Current depth: {self.current_depth:.4f} m")
 
 
     def setpoint_callback(self, msg):
