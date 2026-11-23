@@ -59,6 +59,12 @@ namespace sensors
             "state/pose",
             rclcpp::QoS(rclcpp::KeepLast(1)).reliable().durability_volatile()
         );
+
+        odom_pub_ = this->create_publisher<nav_msgs::msg::Odometry>(
+            "state/odometry",
+            rclcpp::QoS(rclcpp::KeepLast(1)).reliable().durability_volatile()
+        );
+
         tf_broadcaster_ = std::make_unique<tf2_ros::TransformBroadcaster>(*this);
 
         // Initialize state variables
@@ -68,7 +74,10 @@ namespace sensors
         current_orientation_imu_.w = 1.0;
         current_orientation_imu_.x = 0.0;
         current_orientation_imu_.y = 0.0;
-        current_orientation_imu_.z = 0.0;   
+        current_orientation_imu_.z = 0.0;
+        current_angular_velocity_.x = 0.0; 
+        current_angular_velocity_.y = 0.0;   
+        current_angular_velocity_.z = 0.0;
         current_position_vio_ = Vec3::Zero();
         current_orientation_vio_.w = 1.0;
         current_orientation_vio_.x = 0.0;
@@ -88,6 +97,7 @@ namespace sensors
     {
         // Update current orientation from IMU
         current_orientation_imu_ = imu_in->orientation;
+        current_angular_velocity_ = imu_in->angular_velocity;
     }
 
     // Depth callback
@@ -127,15 +137,26 @@ namespace sensors
     // Publish aggregated state
     void State_aggregator::publish_state()
     {
+        nav_msgs::msg::Odometry odom_msg;
+        odom_msg.header.stamp = this->now();
+        odom_msg.header.frame_id = frame_id_global_;   // pool_link (pose frame)
+        odom_msg.child_frame_id = frame_id_auv_;       // auv_link (twist frame)
+
+        odom_msg.pose.pose.orientation = use_vio_for_orientation_ ? current_orientation_vio_ : current_orientation_imu_;
+        odom_msg.pose.pose.position.x = use_vio_for_position_ ? current_position_vio_(0) : current_position_dvl_(0);
+        odom_msg.pose.pose.position.y = use_vio_for_position_ ? current_position_vio_(1) : current_position_dvl_(1);
+        odom_msg.pose.pose.position.z = -current_depth_; // Down is negative Z
+
+        odom_msg.twist.twist.linear.x = current_velocity_(0);
+        odom_msg.twist.twist.linear.y = current_velocity_(1);
+        odom_msg.twist.twist.linear.z = current_velocity_(2);
+        odom_msg.twist.twist.angular = current_angular_velocity_;
+
+        odom_pub_->publish(odom_msg);
+
         geometry_msgs::msg::PoseStamped pose_msg;
-        pose_msg.header.stamp = this->now();
-        pose_msg.header.frame_id = frame_id_global_;
-
-        pose_msg.pose.orientation = use_vio_for_orientation_ ? current_orientation_vio_ : current_orientation_imu_;
-        pose_msg.pose.position.x = use_vio_for_position_ ? current_position_vio_(0) : current_position_dvl_(0);
-        pose_msg.pose.position.y = use_vio_for_position_ ? current_position_vio_(1) : current_position_dvl_(1);
-        pose_msg.pose.position.z = -current_depth_; // Down is negative Z
-
+        pose_msg.header = odom_msg.header;
+        pose_msg.pose = odom_msg.pose.pose;
         pose_pub_->publish(pose_msg);
 
         if (publish_pose_tf_) {

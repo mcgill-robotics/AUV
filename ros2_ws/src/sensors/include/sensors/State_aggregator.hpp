@@ -4,6 +4,8 @@
 #include <sensor_msgs/msg/imu.hpp>
 #include <geometry_msgs/msg/vector3_stamped.hpp>
 #include <geometry_msgs/msg/point_stamped.hpp>
+#include <geometry_msgs/msg/vector3.hpp>  
+#include <nav_msgs/msg/odometry.hpp>
 #include <geometry_msgs/msg/twist_stamped.hpp>
 #include <geometry_msgs/msg/transform_stamped.hpp>
 #include <message_filters/subscriber.h>
@@ -31,6 +33,7 @@ namespace sensors
         private:
  
                 rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr pose_pub_;
+                rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odom_pub_;
                 rclcpp::TimerBase::SharedPtr publish_timer_;
                 std::unique_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
 
@@ -56,6 +59,7 @@ namespace sensors
                 Vec3 current_position_dvl_; // X,Y,Z postion from DVL
                 Vec3 current_velocity_; // DVL
                 geometry_msgs::msg::Quaternion current_orientation_imu_; // Imu
+                geometry_msgs::msg::Vector3 current_angular_velocity_; // Imu angular velocity (body frame)
                 
                 Vec3 current_position_vio_; // X,Y,Z position from VIO
                 geometry_msgs::msg::Quaternion current_orientation_vio_; // VIO orientation
