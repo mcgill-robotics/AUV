@@ -41,7 +41,7 @@ x_controller:
     ros__parameters:
         control_loop_hz: 10.0
         sensor_timeout_sec: 1.0
-        KP: 10.0
+        KP: 5.0
         KD: 7.5
         KI: 0.5
         I_MAX: 10.0

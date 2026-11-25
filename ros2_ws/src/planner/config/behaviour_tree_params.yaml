@@ -3,7 +3,7 @@ planner_root_tree:
     tick_rate        : 3.0   # (Hz) Rate at which the behaviour tree ticks
     sim              : false # Whether the simulation is enabled
     use_ground_truth : false # Whether to use the ground truth for position
-    startup_delay    : 30.0   # (s) Delay before actually starting the mission and enabling the controllers
+    startup_delay    : 0.0   # (s) Delay before actually starting the mission and enabling the controllers
     
     # Force tree to broadcast its state and blackboard to the network continuously
     default_snapshot_stream: true

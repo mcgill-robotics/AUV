@@ -14,6 +14,7 @@ from .debugNavigation.test_style_yaw_spin import TestStyleYawSpin
 from .debugNavigation.test_style_rolling_flip import TestStyleRollingFlip
 from .debugNavigation.test_grabber_behaviour import TestGrabberBehaviour
 from .debugNavigation.test_torpedo_behaviour import TestTorpedoBehaviour
+from .debugNavigation.my_mission import SquareOrbitMission
 
 # --- NEW ROBOSUB 2026 TASKS ---
 from .robosub2026.gate_task import GateTask
@@ -206,6 +207,8 @@ class MissionSpawner(py_trees.behaviour.Behaviour):
                 py_trees.decorators.FailureIsSuccess(name="Resilient Return Home Task", child=ReturnHomeTask(**return_home))
             ])
             return full_run
+        elif choice == 20:
+            return SquareOrbitMission(p['node'],p['angular_tolerance'], p['position_tolerance'], p['hold_time'], p['timeout'])
         return None
 
 class DynamicMissionSequence(py_trees.composites.Sequence):
