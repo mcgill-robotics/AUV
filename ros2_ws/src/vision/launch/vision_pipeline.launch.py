@@ -1,7 +1,7 @@
 import os
 import yaml
 
-from ament_index_python.packages import get_package_share_directory
+from ament_index_python.packages import get_package_prefix, get_package_share_directory
 
 from launch import LaunchDescription
 from launch.actions import IncludeLaunchDescription, DeclareLaunchArgument,TimerAction
@@ -66,6 +66,18 @@ def generate_launch_description():
         "down_model_relative_path",
         default_value="",
         description="Optional override path to the down camera object detection model relative to vision package."
+    )
+
+    front_cam_cpp_arg = DeclareLaunchArgument(
+        "front_cam_cpp",
+        default_value="true",
+        description="Run the C++ front camera node (needs CUDA + TensorRT). Set false to use the Python node."
+    )
+
+    down_cam_cpp_arg = DeclareLaunchArgument(
+        "down_cam_cpp",
+        default_value="false",
+        description="Run the C++ down camera node (needs CUDA + TensorRT) instead of the Python node."
     )
 
     enable_object_detection_arg = DeclareLaunchArgument(
@@ -148,9 +160,17 @@ def generate_launch_description():
         str(default_config["down_cam_object_detection"]["ros__parameters"]["enable_object_detection"]).lower(), "' == 'true' else 'false'"
     ])
     
+    # The C++ node is only built on machines with CUDA + TensorRT (Jetson / NVIDIA images).
+    # Elsewhere (e.g. CPU-only dev containers) fall back to the Python node.
+    cpp_front_detector = os.path.join(get_package_prefix("vision"), "lib", "vision", "front_cam_object_detection")
+    front_detection_executable = PythonExpression([
+        "'front_cam_object_detection' if '", LaunchConfiguration("front_cam_cpp"), "' == 'true' and ",
+        str(os.path.exists(cpp_front_detector)), " else 'front_cam_object_detection.py'"
+    ])
+
     front_detection_node = Node(
         package='vision',
-        executable='front_cam_object_detection.py',
+        executable=front_detection_executable,
         name='front_cam_object_detection',
         parameters=[
             config_path,
@@ -259,9 +279,18 @@ def generate_launch_description():
     )
 
     
+    # The C++ down camera node is only built with CUDA + TensorRT; otherwise always use the Python node.
+    down_cam_cpp_available = os.path.exists(
+        os.path.join(get_package_prefix("vision"), "lib", "vision", "down_cam_object_detection")
+    )
+    down_detection_executable = PythonExpression([
+        "'down_cam_object_detection' if '", LaunchConfiguration("down_cam_cpp"), "' == 'true' and ",
+        str(down_cam_cpp_available), " else 'down_cam_object_detection.py'"
+    ])
+
     down_detection_node = Node(
         package='vision',
-        executable='down_cam_object_detection.py',
+        executable=down_detection_executable,
         name='down_cam_object_detection',
         parameters=[
             config_path,
@@ -313,6 +342,8 @@ def generate_launch_description():
     launch_description.add_action(use_enhance_arg)
     launch_description.add_action(front_model_arg)
     launch_description.add_action(down_model_arg)
+    launch_description.add_action(front_cam_cpp_arg)
+    launch_description.add_action(down_cam_cpp_arg)
     launch_description.add_action(enable_object_detection_arg)
     launch_description.add_action(has_zed_sdk_arg)
     launch_description.add_action(zed_stream_ip_arg)
